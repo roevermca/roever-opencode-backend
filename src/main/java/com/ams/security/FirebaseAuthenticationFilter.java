@@ -88,7 +88,18 @@ public class FirebaseAuthenticationFilter extends OncePerRequestFilter {
                     String[] parts = normalizedToken.split("\\.");
                     if (parts.length >= 2) {
                         try {
-                            byte[] decodedBytes = Base64.getUrlDecoder().decode(parts[1]);
+                            String payloadPart = parts[1].trim();
+                            byte[] decodedBytes;
+                            try {
+                                decodedBytes = Base64.getUrlDecoder().decode(payloadPart);
+                            } catch (Exception e1) {
+                                try {
+                                    decodedBytes = Base64.getDecoder().decode(payloadPart);
+                                } catch (Exception e2) {
+                                    String padded = payloadPart + "=".repeat((4 - payloadPart.length() % 4) % 4);
+                                    decodedBytes = Base64.getUrlDecoder().decode(padded);
+                                }
+                            }
                             String payloadJson = new String(decodedBytes, StandardCharsets.UTF_8);
                             JsonNode node = objectMapper.readTree(payloadJson);
                             if (node.hasNonNull("email")) {
@@ -135,6 +146,21 @@ public class FirebaseAuthenticationFilter extends OncePerRequestFilter {
                 }
                 if (devUser.isEmpty() && email != null) {
                     devUser = userRepository.findByEmail(email);
+                }
+
+                // Master Admin Auto-Heal: guarantee roevermca09@gmail.com is ALWAYS registered as ADMIN
+                if (devUser.isEmpty() && email != null && ("roevermca09@gmail.com".equalsIgnoreCase(email) || email.startsWith("roevermca09@"))) {
+                    logger.info("Auto-provisioning Master Admin account for {}", email);
+                    User adminUser = new User(
+                            firebaseUid != null ? firebaseUid : "firebase-admin-master",
+                            tokenName != null ? tokenName : "Roever Administrator",
+                            email.toLowerCase().trim(),
+                            Role.ADMIN,
+                            "Administration",
+                            null,
+                            true
+                    );
+                    devUser = Optional.of(userRepository.save(adminUser));
                 }
 
                 if (devUser.isEmpty()) {
@@ -222,6 +248,21 @@ public class FirebaseAuthenticationFilter extends OncePerRequestFilter {
         Optional<User> userOptional = userRepository.findByFirebaseUid(firebaseUid);
         if (userOptional.isEmpty() && email != null) {
             userOptional = userRepository.findByEmail(email.toLowerCase().trim());
+        }
+
+        // Master Admin Auto-Heal: guarantee roevermca09@gmail.com is ALWAYS registered as ADMIN
+        if (userOptional.isEmpty() && email != null && ("roevermca09@gmail.com".equalsIgnoreCase(email) || email.startsWith("roevermca09@"))) {
+            logger.info("Auto-provisioning Master Admin account for {} with Firebase UID {}", email, firebaseUid);
+            User adminUser = new User(
+                    firebaseUid,
+                    name != null ? name : "Roever Administrator",
+                    email.toLowerCase().trim(),
+                    Role.ADMIN,
+                    "Administration",
+                    null,
+                    true
+            );
+            userOptional = Optional.of(userRepository.save(adminUser));
         }
 
         if (userOptional.isEmpty()) {

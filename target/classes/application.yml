@@ -17,7 +17,7 @@ firebase:
   project-id: ${FIREBASE_PROJECT_ID:roever-ams}
 
 cors:
-  allowed-origins: ${ALLOWED_ORIGINS:http://localhost:5173,http://localhost:4173,http://localhost:3000,https://*.vercel.app,*}
+  allowed-origins: ${ALLOWED_ORIGINS:http://localhost:5173,http://localhost:4173,http://localhost:3000,https://roevermca.netlify.app,https://*.netlify.app,https://*.vercel.app,*}
 
 logging:
   level:

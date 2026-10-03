@@ -38,6 +38,7 @@ com/ams/security/SecurityConfig.class
 com/ams/security/CustomAccessDeniedHandler.class
 com/ams/dto/PageResponse.class
 com/ams/model/Student.class
+com/ams/config/MongoConfig$1.class
 com/ams/dto/DepartmentReportResponse.class
 com/ams/security/AuthenticatedUser.class
 com/ams/dto/UpdateAttendanceRequest.class

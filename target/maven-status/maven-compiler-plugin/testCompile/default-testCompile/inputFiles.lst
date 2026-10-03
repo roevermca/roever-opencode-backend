@@ -1,0 +1,10 @@
+/home/u1/Downloads/Roever/backend/src/test/java/com/ams/controller/HealthControllerTest.java
+/home/u1/Downloads/Roever/backend/src/test/java/com/ams/exception/GlobalExceptionHandlerTest.java
+/home/u1/Downloads/Roever/backend/src/test/java/com/ams/model/ModelValidationTest.java
+/home/u1/Downloads/Roever/backend/src/test/java/com/ams/security/FirebaseAuthenticationFilterTest.java
+/home/u1/Downloads/Roever/backend/src/test/java/com/ams/security/SecurityAuthorizationTest.java
+/home/u1/Downloads/Roever/backend/src/test/java/com/ams/service/AttendanceServiceTest.java
+/home/u1/Downloads/Roever/backend/src/test/java/com/ams/service/CourseServiceTest.java
+/home/u1/Downloads/Roever/backend/src/test/java/com/ams/service/DepartmentServiceTest.java
+/home/u1/Downloads/Roever/backend/src/test/java/com/ams/service/ReportServiceTest.java
+/home/u1/Downloads/Roever/backend/src/test/java/com/ams/service/StudentServiceTest.java

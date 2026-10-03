@@ -1,0 +1,10 @@
+com/ams/security/SecurityAuthorizationTest.class
+com/ams/model/ModelValidationTest.class
+com/ams/service/ReportServiceTest.class
+com/ams/exception/GlobalExceptionHandlerTest.class
+com/ams/controller/HealthControllerTest.class
+com/ams/service/StudentServiceTest.class
+com/ams/security/FirebaseAuthenticationFilterTest.class
+com/ams/service/CourseServiceTest.class
+com/ams/service/AttendanceServiceTest.class
+com/ams/service/DepartmentServiceTest.class

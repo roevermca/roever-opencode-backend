@@ -1,0 +1,20 @@
+server:
+  port: 0
+
+spring:
+  application:
+    name: attendance-management-system-test
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.mongo.MongoAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.mongo.MongoDataAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.mongo.MongoRepositoriesAutoConfiguration
+
+firebase:
+  credentials:
+    path: ""
+    json: ""
+  project-id: "test-ams-project"
+
+cors:
+  allowed-origins: "http://localhost:5173"

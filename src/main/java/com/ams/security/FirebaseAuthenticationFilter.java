@@ -1,0 +1,278 @@
+package com.ams.security;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
+import java.util.Optional;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.DisabledException;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
+import org.springframework.stereotype.Component;
+import org.springframework.web.filter.OncePerRequestFilter;
+
+import com.ams.model.Role;
+import com.ams.model.Student;
+import com.ams.model.User;
+import com.ams.repository.StudentRepository;
+import com.ams.repository.UserRepository;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseToken;
+
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+
+@Component
+public class FirebaseAuthenticationFilter extends OncePerRequestFilter {
+
+    private static final Logger logger = LoggerFactory.getLogger(FirebaseAuthenticationFilter.class);
+    private static final ObjectMapper objectMapper = new ObjectMapper();
+    public static final String AUTHENTICATED_USER_ATTR = "AUTHENTICATED_USER";
+
+    private final ObjectProvider<FirebaseAuth> firebaseAuthProvider;
+    private final ObjectProvider<UserRepository> userRepositoryProvider;
+    private final ObjectProvider<StudentRepository> studentRepositoryProvider;
+    private final CustomAuthenticationEntryPoint authenticationEntryPoint;
+
+    public FirebaseAuthenticationFilter(
+            ObjectProvider<FirebaseAuth> firebaseAuthProvider,
+            ObjectProvider<UserRepository> userRepositoryProvider,
+            ObjectProvider<StudentRepository> studentRepositoryProvider,
+            CustomAuthenticationEntryPoint authenticationEntryPoint) {
+        this.firebaseAuthProvider = firebaseAuthProvider;
+        this.userRepositoryProvider = userRepositoryProvider;
+        this.studentRepositoryProvider = studentRepositoryProvider;
+        this.authenticationEntryPoint = authenticationEntryPoint;
+    }
+
+    @Override
+    protected void doFilterInternal(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            FilterChain filterChain) throws ServletException, IOException {
+
+        String authHeader = request.getHeader("Authorization");
+
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
+        String token = authHeader.substring(7).trim();
+        if (token.isEmpty() || "null".equalsIgnoreCase(token) || "undefined".equalsIgnoreCase(token)) {
+            authenticationEntryPoint.commence(request, response,
+                    new BadCredentialsException("Bearer token cannot be empty"));
+            return;
+        }
+
+        FirebaseAuth firebaseAuth = firebaseAuthProvider.getIfAvailable();
+        if (firebaseAuth == null) {
+            UserRepository userRepository = userRepositoryProvider.getIfAvailable();
+            if (userRepository != null) {
+                String normalizedToken = token.trim();
+                String email = null;
+                String firebaseUid = null;
+                String tokenName = null;
+
+                // 1. If token is a JWT (e.g. Firebase ID Token)
+                if (normalizedToken.contains(".")) {
+                    String[] parts = normalizedToken.split("\\.");
+                    if (parts.length >= 2) {
+                        try {
+                            byte[] decodedBytes = Base64.getUrlDecoder().decode(parts[1]);
+                            String payloadJson = new String(decodedBytes, StandardCharsets.UTF_8);
+                            JsonNode node = objectMapper.readTree(payloadJson);
+                            if (node.hasNonNull("email")) {
+                                email = node.get("email").asText().toLowerCase().trim();
+                            }
+                            if (node.hasNonNull("user_id")) {
+                                firebaseUid = node.get("user_id").asText().trim();
+                            } else if (node.hasNonNull("sub")) {
+                                firebaseUid = node.get("sub").asText().trim();
+                            }
+                            if (node.hasNonNull("name")) {
+                                tokenName = node.get("name").asText().trim();
+                            }
+                        } catch (Exception e) {
+                            logger.warn("Could not decode JWT payload in dev mode: {}", e.getMessage());
+                        }
+                    }
+                }
+
+                // 2. Direct email or UID passed in Bearer token (for dev/curl test)
+                if (email == null && normalizedToken.contains("@")) {
+                    email = normalizedToken.toLowerCase().trim();
+                }
+                if (firebaseUid == null && !normalizedToken.contains(".")) {
+                    firebaseUid = normalizedToken.trim();
+                }
+
+                // 3. Exact matching shortcuts for local curl tests (e.g. Bearer admin / Bearer vp)
+                if (email == null && "admin".equalsIgnoreCase(normalizedToken)) {
+                    email = "admin@amsportal.edu";
+                } else if (email == null && "vp".equalsIgnoreCase(normalizedToken)) {
+                    email = "vp@amsportal.edu";
+                } else if (email == null && "hod".equalsIgnoreCase(normalizedToken)) {
+                    email = "hod.cs@amsportal.edu";
+                } else if (email == null && "staff".equalsIgnoreCase(normalizedToken)) {
+                    email = "staff@amsportal.edu";
+                } else if (email == null && "student".equalsIgnoreCase(normalizedToken)) {
+                    email = "student@amsportal.edu";
+                }
+
+                Optional<User> devUser = Optional.empty();
+                if (firebaseUid != null) {
+                    devUser = userRepository.findByFirebaseUid(firebaseUid);
+                }
+                if (devUser.isEmpty() && email != null) {
+                    devUser = userRepository.findByEmail(email);
+                }
+
+                if (devUser.isEmpty()) {
+                    logger.warn("Dev mode authentication failed for unknown user: email={}, uid={}", email, firebaseUid);
+                    authenticationEntryPoint.commence(request, response,
+                            new BadCredentialsException("User account not registered in system"));
+                    return;
+                }
+
+                if (devUser.isPresent()) {
+                    User user = devUser.get();
+                    if (!user.isActive()) {
+                        logger.warn("Inactive user attempted to authenticate in dev mode: {}", user.getEmail());
+                        authenticationEntryPoint.commence(request, response,
+                                new DisabledException("User account is inactive"));
+                        return;
+                    }
+
+                    // Link actual Firebase UID if not yet linked
+                    if (firebaseUid != null && (user.getFirebaseUid() == null || user.getFirebaseUid().startsWith("usr_") || user.getFirebaseUid().startsWith("stu_") || user.getFirebaseUid().startsWith("firebase-"))) {
+                        user.setFirebaseUid(firebaseUid);
+                        userRepository.save(user);
+                    }
+
+                    String studentId = null;
+                    if (user.getRole() == Role.STUDENT) {
+                        StudentRepository studentRepository = studentRepositoryProvider.getIfAvailable();
+                        if (studentRepository != null && user.getEmail() != null) {
+                            studentId = studentRepository.findByEmail(user.getEmail().toLowerCase().trim())
+                                    .map(Student::getId)
+                                    .orElse(null);
+                        }
+                    }
+
+                    AuthenticatedUser authenticatedUser = new AuthenticatedUser(
+                            user.getId(),
+                            user.getFirebaseUid(),
+                            user.getEmail(),
+                            user.getName() != null ? user.getName() : (tokenName != null ? tokenName : user.getEmail()),
+                            user.getRole(),
+                            user.getDepartmentId(),
+                            user.getCourseId(),
+                            studentId
+                    );
+
+                    UsernamePasswordAuthenticationToken authentication =
+                            new UsernamePasswordAuthenticationToken(authenticatedUser, null, authenticatedUser.getAuthorities());
+                    authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+
+                    SecurityContextHolder.getContext().setAuthentication(authentication);
+                    request.setAttribute(AUTHENTICATED_USER_ATTR, authenticatedUser);
+
+                    filterChain.doFilter(request, response);
+                    return;
+                }
+            }
+
+            logger.warn("FirebaseAuth instance not available. Firebase credentials may be missing.");
+            authenticationEntryPoint.commence(request, response,
+                    new BadCredentialsException("Firebase authentication service is not configured"));
+            return;
+        }
+
+        FirebaseToken decodedToken;
+        try {
+            decodedToken = firebaseAuth.verifyIdToken(token);
+        } catch (Exception e) {
+            logger.warn("Firebase ID token verification failed: {}", e.getMessage());
+            authenticationEntryPoint.commence(request, response,
+                    new BadCredentialsException("Invalid or expired Firebase token"));
+            return;
+        }
+
+        String firebaseUid = decodedToken.getUid();
+        String email = decodedToken.getEmail();
+        String name = decodedToken.getName();
+
+        UserRepository userRepository = userRepositoryProvider.getIfAvailable();
+        if (userRepository == null) {
+            authenticationEntryPoint.commence(request, response,
+                    new BadCredentialsException("Database service unavailable"));
+            return;
+        }
+
+        Optional<User> userOptional = userRepository.findByFirebaseUid(firebaseUid);
+        if (userOptional.isEmpty() && email != null) {
+            userOptional = userRepository.findByEmail(email.toLowerCase().trim());
+        }
+
+        if (userOptional.isEmpty()) {
+            logger.warn("User with Firebase UID {} not found in database", firebaseUid);
+            authenticationEntryPoint.commence(request, response,
+                    new BadCredentialsException("User account not registered in system"));
+            return;
+        }
+
+        User user = userOptional.get();
+        if (!user.isActive()) {
+            logger.warn("Inactive user attempted to authenticate: {}", email);
+            authenticationEntryPoint.commence(request, response,
+                    new DisabledException("User account is inactive"));
+            return;
+        }
+
+        // Link actual Firebase UID if not yet linked
+        if (firebaseUid != null && (user.getFirebaseUid() == null || user.getFirebaseUid().startsWith("usr_") || user.getFirebaseUid().startsWith("stu_") || user.getFirebaseUid().startsWith("firebase-"))) {
+            user.setFirebaseUid(firebaseUid);
+            userRepository.save(user);
+        }
+
+        String studentId = null;
+        if (user.getRole() == Role.STUDENT) {
+            StudentRepository studentRepository = studentRepositoryProvider.getIfAvailable();
+            if (studentRepository != null && email != null) {
+                studentId = studentRepository.findByEmail(email.toLowerCase().trim())
+                        .map(Student::getId)
+                        .orElse(null);
+            }
+        }
+
+        AuthenticatedUser authenticatedUser = new AuthenticatedUser(
+                user.getId(),
+                firebaseUid,
+                email != null ? email : user.getEmail(),
+                name != null ? name : user.getName(),
+                user.getRole(),
+                user.getDepartmentId(),
+                user.getCourseId(),
+                studentId
+        );
+
+        UsernamePasswordAuthenticationToken authentication =
+                new UsernamePasswordAuthenticationToken(authenticatedUser, null, authenticatedUser.getAuthorities());
+        authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+        request.setAttribute(AUTHENTICATED_USER_ATTR, authenticatedUser);
+
+        filterChain.doFilter(request, response);
+    }
+}

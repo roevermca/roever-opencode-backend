@@ -116,6 +116,26 @@ class StudentServiceTest {
     }
 
     @Test
+    @DisplayName("Throw IllegalArgumentException when PG year exceeds 2")
+    void createStudent_pgYearExceedsTwo_throwsException() {
+        StudentRequest pgReq = new StudentRequest(
+                "2024MCA01", "Priya", "priya@amsportal.edu", "9876543210",
+                "dept-ca", "course-mca", ProgramType.PG, 3, "A", true
+        );
+        assertThrows(IllegalArgumentException.class, () -> studentService.createStudent(pgReq));
+    }
+
+    @Test
+    @DisplayName("Throw IllegalArgumentException when UG year exceeds 3")
+    void createStudent_ugYearExceedsThree_throwsException() {
+        StudentRequest ugReq = new StudentRequest(
+                "2024BCA01", "Kumar", "kumar@amsportal.edu", "9876543210",
+                "dept-ca", "course-bca", ProgramType.UG, 4, "A", true
+        );
+        assertThrows(IllegalArgumentException.class, () -> studentService.createStudent(ugReq));
+    }
+
+    @Test
     @DisplayName("Retrieve paginated students with metadata")
     void getStudents_pagination() {
         List<Student> mockList = new ArrayList<>();

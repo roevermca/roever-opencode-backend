@@ -13,6 +13,8 @@ public interface DepartmentRepository extends MongoRepository<Department, String
 
     Optional<Department> findByCode(String code);
 
+    Optional<Department> findByName(String name);
+
     boolean existsByCode(String code);
 
     List<Department> findByActiveTrue();

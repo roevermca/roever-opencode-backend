@@ -76,78 +76,114 @@ public class DataInitializer implements CommandLineRunner {
             });
         }
 
-        // 2. Seed 18 Authentic Thanthai Hans Roever College Arts & Science Departments
-        Department ca = seedDept("Computer Applications", "CA");
-        Department cs = seedDept("Computer Science & IT", "CS");
+        // 2. Seed 20 Authentic Departments from Roever Arts & Science
+        Department tam = seedDept("Tamil", "TAM");
+        Department eng = seedDept("English", "ENG");
         Department com = seedDept("Commerce", "COM");
+        Department comCaCs = seedDept("Commerce CA & Commerce CS", "COM-CA-CS");
         Department ms = seedDept("Management Studies", "MS");
+        Department sw = seedDept("Social Work", "SW");
         Department math = seedDept("Mathematics", "MATH");
         Department phy = seedDept("Physics", "PHY");
         Department chem = seedDept("Chemistry", "CHEM");
+        Department ca = seedDept("Computer Applications", "CA");
+        Department cs = seedDept("Computer Science, Information Technology and Artificial Intelligence & Machine Learning", "CS");
         Department biotech = seedDept("Biotechnology", "BIOTECH");
-        Department bot = seedDept("Botany", "BOT");
-        Department zoo = seedDept("Zoology", "ZOO");
         Department micro = seedDept("Microbiology", "MICRO");
         Department nd = seedDept("Nutrition and Dietetics", "ND");
-        Department tam = seedDept("Tamil", "TAM");
-        Department eng = seedDept("English", "ENG");
-        Department sw = seedDept("Social Work", "SW");
-        Department viscom = seedDept("Visual Communication", "VISCOM");
-        Department hmcs = seedDept("Hotel Management", "HMCS");
+        Department bot = seedDept("Botany", "BOT");
+        Department zoo = seedDept("Zoology", "ZOO");
         Department ped = seedDept("Physical Education", "PED");
+        Department hmcs = seedDept("Hotel Management & Catering Science", "HMCS");
+        Department viscom = seedDept("Visual Communication", "VISCOM");
+        Department pa = seedDept("Performing Arts", "PA");
         Department adminDept = seedDept("Administration", "ADMIN");
 
-        // 3. Seed Arts & Science Degree Courses (UG: 3 Yrs, PG: 2 Yrs)
-        Course bca = seedCourse("BCA", "BCA", ca.getId(), ProgramType.UG, 3);
-        Course mca = seedCourse("MCA", "MCA", ca.getId(), ProgramType.PG, 2);
-
-        seedCourse("B.Sc Computer Science", "BSC-CS", cs.getId(), ProgramType.UG, 3);
-        seedCourse("B.Sc Information Technology", "BSC-IT", cs.getId(), ProgramType.UG, 3);
-        seedCourse("M.Sc Computer Science", "MSC-CS", cs.getId(), ProgramType.PG, 2);
-
-        seedCourse("B.Com", "BCOM", com.getId(), ProgramType.UG, 3);
-        seedCourse("B.Com (CA)", "BCOM-CA", com.getId(), ProgramType.UG, 3);
-        seedCourse("B.Com (CS)", "BCOM-CS", com.getId(), ProgramType.UG, 3);
-        seedCourse("M.Com", "MCOM", com.getId(), ProgramType.PG, 2);
-
-        seedCourse("BBA", "BBA", ms.getId(), ProgramType.UG, 3);
-        seedCourse("MBA", "MBA", ms.getId(), ProgramType.PG, 2);
-
-        seedCourse("B.Sc Mathematics", "BSC-MATH", math.getId(), ProgramType.UG, 3);
-        seedCourse("M.Sc Mathematics", "MSC-MATH", math.getId(), ProgramType.PG, 2);
-
-        seedCourse("B.Sc Physics", "BSC-PHY", phy.getId(), ProgramType.UG, 3);
-        seedCourse("M.Sc Physics", "MSC-PHY", phy.getId(), ProgramType.PG, 2);
-
-        seedCourse("B.Sc Chemistry", "BSC-CHEM", chem.getId(), ProgramType.UG, 3);
-        seedCourse("M.Sc Chemistry", "MSC-CHEM", chem.getId(), ProgramType.PG, 2);
-
-        seedCourse("B.Sc Biotechnology", "BSC-BIOTECH", biotech.getId(), ProgramType.UG, 3);
-        seedCourse("M.Sc Biotechnology", "MSC-BIOTECH", biotech.getId(), ProgramType.PG, 2);
-
-        seedCourse("B.Sc Botany", "BSC-BOT", bot.getId(), ProgramType.UG, 3);
-        seedCourse("M.Sc Botany", "MSC-BOT", bot.getId(), ProgramType.PG, 2);
-
-        seedCourse("B.Sc Zoology", "BSC-ZOO", zoo.getId(), ProgramType.UG, 3);
-        seedCourse("M.Sc Zoology", "MSC-ZOO", zoo.getId(), ProgramType.PG, 2);
-
-        seedCourse("B.Sc Microbiology", "BSC-MICRO", micro.getId(), ProgramType.UG, 3);
-        seedCourse("M.Sc Microbiology", "MSC-MICRO", micro.getId(), ProgramType.PG, 2);
-
-        seedCourse("B.Sc Nutrition & Dietetics", "BSC-ND", nd.getId(), ProgramType.UG, 3);
-
+        // 3. Seed Arts & Science Degree Courses (UG: 3 Years, PG: 2 Years)
+        // Tamil
         seedCourse("B.Lit. Tamil", "BLIT-TAM", tam.getId(), ProgramType.UG, 3);
+        seedCourse("B.A. Tamil", "BA-TAM", tam.getId(), ProgramType.UG, 3);
         seedCourse("M.A. Tamil", "MA-TAM", tam.getId(), ProgramType.PG, 2);
 
+        // English
         seedCourse("B.A. English", "BA-ENG", eng.getId(), ProgramType.UG, 3);
         seedCourse("M.A. English", "MA-ENG", eng.getId(), ProgramType.PG, 2);
 
+        // Commerce
+        seedCourse("B.Com", "BCOM", com.getId(), ProgramType.UG, 3);
+        seedCourse("M.Com", "MCOM", com.getId(), ProgramType.PG, 2);
+
+        // Commerce CA & Commerce CS
+        seedCourse("B.Com (CA)", "BCOM-CA", comCaCs.getId(), ProgramType.UG, 3);
+        seedCourse("B.Com (CS)", "BCOM-CS", comCaCs.getId(), ProgramType.UG, 3);
+        seedCourse("M.Com (CA)", "MCOM-CA", comCaCs.getId(), ProgramType.PG, 2);
+
+        // Management Studies
+        seedCourse("BBA", "BBA", ms.getId(), ProgramType.UG, 3);
+        seedCourse("MBA", "MBA", ms.getId(), ProgramType.PG, 2);
+
+        // Social Work
         seedCourse("BSW", "BSW", sw.getId(), ProgramType.UG, 3);
         seedCourse("MSW", "MSW", sw.getId(), ProgramType.PG, 2);
 
-        seedCourse("B.Sc Visual Communication", "BSC-VISCOM", viscom.getId(), ProgramType.UG, 3);
-        seedCourse("B.Sc Hotel Management & Catering Science", "BSC-HMCS", hmcs.getId(), ProgramType.UG, 3);
+        // Mathematics
+        seedCourse("B.Sc Mathematics", "BSC-MATH", math.getId(), ProgramType.UG, 3);
+        seedCourse("M.Sc Mathematics", "MSC-MATH", math.getId(), ProgramType.PG, 2);
+
+        // Physics
+        seedCourse("B.Sc Physics", "BSC-PHY", phy.getId(), ProgramType.UG, 3);
+        seedCourse("M.Sc Physics", "MSC-PHY", phy.getId(), ProgramType.PG, 2);
+
+        // Chemistry
+        seedCourse("B.Sc Chemistry", "BSC-CHEM", chem.getId(), ProgramType.UG, 3);
+        seedCourse("M.Sc Chemistry", "MSC-CHEM", chem.getId(), ProgramType.PG, 2);
+
+        // Computer Applications
+        seedCourse("BCA", "BCA", ca.getId(), ProgramType.UG, 3);
+        seedCourse("MCA", "MCA", ca.getId(), ProgramType.PG, 2);
+
+        // Computer Science, Information Technology and Artificial Intelligence & Machine Learning
+        seedCourse("B.Sc Computer Science", "BSC-CS", cs.getId(), ProgramType.UG, 3);
+        seedCourse("B.Sc Information Technology", "BSC-IT", cs.getId(), ProgramType.UG, 3);
+        seedCourse("B.Sc Artificial Intelligence & Machine Learning", "BSC-AIML", cs.getId(), ProgramType.UG, 3);
+        seedCourse("M.Sc Computer Science", "MSC-CS", cs.getId(), ProgramType.PG, 2);
+        seedCourse("M.Sc Information Technology", "MSC-IT", cs.getId(), ProgramType.PG, 2);
+
+        // Biotechnology
+        seedCourse("B.Sc Biotechnology", "BSC-BIOTECH", biotech.getId(), ProgramType.UG, 3);
+        seedCourse("M.Sc Biotechnology", "MSC-BIOTECH", biotech.getId(), ProgramType.PG, 2);
+
+        // Microbiology
+        seedCourse("B.Sc Microbiology", "BSC-MICRO", micro.getId(), ProgramType.UG, 3);
+        seedCourse("M.Sc Microbiology", "MSC-MICRO", micro.getId(), ProgramType.PG, 2);
+
+        // Nutrition and Dietetics
+        seedCourse("B.Sc Nutrition and Dietetics", "BSC-ND", nd.getId(), ProgramType.UG, 3);
+        seedCourse("M.Sc Nutrition and Dietetics", "MSC-ND", nd.getId(), ProgramType.PG, 2);
+
+        // Botany
+        seedCourse("B.Sc Botany", "BSC-BOT", bot.getId(), ProgramType.UG, 3);
+        seedCourse("M.Sc Botany", "MSC-BOT", bot.getId(), ProgramType.PG, 2);
+
+        // Zoology
+        seedCourse("B.Sc Zoology", "BSC-ZOO", zoo.getId(), ProgramType.UG, 3);
+        seedCourse("M.Sc Zoology", "MSC-ZOO", zoo.getId(), ProgramType.PG, 2);
+
+        // Physical Education
         seedCourse("B.Sc Physical Education", "BSC-PED", ped.getId(), ProgramType.UG, 3);
+        seedCourse("M.P.Ed", "MPED", ped.getId(), ProgramType.PG, 2);
+
+        // Hotel Management & Catering Science
+        seedCourse("B.Sc Hotel Management & Catering Science", "BSC-HMCS", hmcs.getId(), ProgramType.UG, 3);
+        seedCourse("M.Sc Hotel Management & Catering Science", "MSC-HMCS", hmcs.getId(), ProgramType.PG, 2);
+
+        // Visual Communication
+        seedCourse("B.Sc Visual Communication", "BSC-VISCOM", viscom.getId(), ProgramType.UG, 3);
+        seedCourse("M.Sc Visual Communication", "MSC-VISCOM", viscom.getId(), ProgramType.PG, 2);
+
+        // Performing Arts
+        seedCourse("B.A. Performing Arts", "BA-PA", pa.getId(), ProgramType.UG, 3);
+        seedCourse("M.A. Performing Arts", "MA-PA", pa.getId(), ProgramType.PG, 2);
 
         // 4. Clean up any legacy mock/default accounts and dummy students
         List<String> legacyMockEmails = List.of(
@@ -196,11 +232,32 @@ public class DataInitializer implements CommandLineRunner {
 
     private Department seedDept(String name, String code) {
         return departmentRepository.findByCode(code)
+                .or(() -> departmentRepository.findByName(name))
+                .map(existing -> {
+                    if (!existing.getName().equals(name) || !existing.getCode().equals(code) || !existing.isActive()) {
+                        existing.setName(name);
+                        existing.setCode(code);
+                        existing.setActive(true);
+                        return departmentRepository.save(existing);
+                    }
+                    return existing;
+                })
                 .orElseGet(() -> departmentRepository.save(new Department(name, code, true)));
     }
 
     private Course seedCourse(String name, String code, String deptId, ProgramType type, int duration) {
         return courseRepository.findByCode(code)
+                .map(existing -> {
+                    if (!existing.getName().equals(name) || existing.getDurationYears() != duration || existing.getProgramType() != type || !existing.getDepartmentId().equals(deptId) || !existing.isActive()) {
+                        existing.setName(name);
+                        existing.setDepartmentId(deptId);
+                        existing.setProgramType(type);
+                        existing.setDurationYears(duration);
+                        existing.setActive(true);
+                        return courseRepository.save(existing);
+                    }
+                    return existing;
+                })
                 .orElseGet(() -> courseRepository.save(new Course(name, code, deptId, type, duration, true)));
     }
 

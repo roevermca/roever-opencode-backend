@@ -248,6 +248,7 @@ public class StudentService {
                 ? request.getCourseId().trim()
                 : request.getDepartmentId().trim();
         ProgramType programType = request.getProgramType() != null ? request.getProgramType() : ProgramType.UG;
+        validateProgramDuration(programType, request.getYear());
 
         Student student = new Student(
                 rollNo,
@@ -364,6 +365,8 @@ public class StudentService {
         } else if (student.getCourseId() == null || student.getCourseId().isBlank()) {
             student.setCourseId(request.getDepartmentId().trim());
         }
+        ProgramType resolvedProgramType = request.getProgramType() != null ? request.getProgramType() : student.getProgramType();
+        validateProgramDuration(resolvedProgramType, request.getYear());
         if (request.getProgramType() != null) {
             student.setProgramType(request.getProgramType());
         }
@@ -456,6 +459,15 @@ public class StudentService {
 
         // 4. Delete the student entity
         studentRepository.delete(student);
+    }
+
+    private void validateProgramDuration(ProgramType programType, Integer year) {
+        if (programType == null || year == null) return;
+        if (programType == ProgramType.PG && (year < 1 || year > 2)) {
+            throw new IllegalArgumentException("PG program duration is 2 years (Year 1 or 2). Invalid year: " + year);
+        } else if (programType == ProgramType.UG && (year < 1 || year > 3)) {
+            throw new IllegalArgumentException("UG program duration is 3 years (Year 1, 2, or 3). Invalid year: " + year);
+        }
     }
 }
 

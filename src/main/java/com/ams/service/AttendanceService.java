@@ -186,6 +186,19 @@ public class AttendanceService {
             AttendanceStatus status,
             int page,
             int size) {
+        return getAttendanceHistory(studentId, null, date, startDate, endDate, period, status, page, size);
+    }
+
+    public PageResponse<AttendanceResponse> getAttendanceHistory(
+            String studentId,
+            List<String> studentIds,
+            LocalDate date,
+            LocalDate startDate,
+            LocalDate endDate,
+            Integer period,
+            AttendanceStatus status,
+            int page,
+            int size) {
 
         AuthenticatedUser currentUser = SecurityUtils.getCurrentUser();
         List<Criteria> filters = new ArrayList<>();
@@ -229,6 +242,14 @@ public class AttendanceService {
 
         if (studentId != null && !studentId.isBlank()) {
             filters.add(Criteria.where("studentId").is(studentId.trim()));
+        } else if (studentIds != null && !studentIds.isEmpty()) {
+            List<String> validIds = studentIds.stream()
+                    .filter(id -> id != null && !id.isBlank())
+                    .map(String::trim)
+                    .toList();
+            if (!validIds.isEmpty()) {
+                filters.add(Criteria.where("studentId").in(validIds));
+            }
         }
         if (date != null) {
             filters.add(Criteria.where("date").is(date));

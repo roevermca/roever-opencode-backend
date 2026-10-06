@@ -10,7 +10,7 @@ spring:
     name: attendance-management-system
   data:
     mongodb:
-      uri: ${MONGODB_URI:mongodb+srv://admin:Password123@cluster0.dxhx0zh.mongodb.net/ams_db?appName=Cluster0}
+      uri: ${MONGODB_URI:mongodb+srv://admin:Password123@cluster0.dxhx0zh.mongodb.net/ams_db?appName=Cluster0&maxPoolSize=15&minPoolSize=2&maxIdleTimeMS=60000&waitQueueTimeoutMS=5000}
       database: ${MONGODB_DATABASE:ams_db}
       auto-index-creation: true
 

@@ -1,6 +1,7 @@
 package com.ams.controller;
 
 import java.time.LocalDate;
+import java.util.List;
 
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
@@ -45,6 +46,7 @@ public class AttendanceController {
     @GetMapping
     public ResponseEntity<PageResponse<AttendanceResponse>> getAttendanceHistory(
             @RequestParam(required = false) String studentId,
+            @RequestParam(required = false) List<String> studentIds,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
@@ -54,7 +56,7 @@ public class AttendanceController {
             @RequestParam(defaultValue = "20") int size) {
 
         PageResponse<AttendanceResponse> response = attendanceService.getAttendanceHistory(
-                studentId, date, startDate, endDate, period, status, page, size
+                studentId, studentIds, date, startDate, endDate, period, status, page, size
         );
         return ResponseEntity.ok(response);
     }

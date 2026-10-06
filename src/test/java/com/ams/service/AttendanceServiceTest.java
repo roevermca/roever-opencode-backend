@@ -275,4 +275,25 @@ class AttendanceServiceTest {
         assertThat(response.getTotalElements()).isEqualTo(55L);
         assertThat(response.getTotalPages()).isEqualTo(3);
     }
+
+    @Test
+    @DisplayName("Attendance history with studentIds filter queries only target students")
+    void attendanceHistory_withStudentIdsList() {
+        setSecurityContext("admin-1", Role.ADMIN, "dept-admin", null);
+
+        List<Attendance> mockRecords = List.of(
+                new Attendance("std-1", LocalDate.of(2026, 10, 2), 1, AttendanceStatus.PRESENT, "staff-1", java.time.Instant.now()),
+                new Attendance("std-2", LocalDate.of(2026, 10, 2), 1, AttendanceStatus.ABSENT, "staff-1", java.time.Instant.now())
+        );
+
+        given(mongoTemplate.count(any(Query.class), eq(Attendance.class))).willReturn(2L);
+        given(mongoTemplate.find(any(Query.class), eq(Attendance.class))).willReturn(mockRecords);
+
+        PageResponse<AttendanceResponse> response = attendanceService.getAttendanceHistory(
+                null, List.of("std-1", "std-2"), LocalDate.of(2026, 10, 2), null, null, 1, null, 0, 20
+        );
+
+        assertThat(response.getData()).hasSize(2);
+        assertThat(response.getTotalElements()).isEqualTo(2L);
+    }
 }

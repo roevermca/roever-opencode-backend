@@ -405,6 +405,7 @@ public class StudentService {
 
     public void deleteStudent(String id) {
         Student student = studentRepository.findById(id)
+                .or(() -> studentRepository.findByRollNo(id))
                 .orElseThrow(() -> new ResourceNotFoundException("Student not found with ID: " + id));
         SecurityUtils.enforceStudentWriteAccess(student.getDepartmentId());
 
@@ -416,10 +417,16 @@ public class StudentService {
 
         // 2. Cascade delete all attendance records for this student across all identifier variations
         List<Criteria> attCriteria = new ArrayList<>();
-        attCriteria.add(Criteria.where("studentId").is(student.getId()));
-        attCriteria.add(Criteria.where("studentId").is(id));
+        if (student.getId() != null) {
+            attCriteria.add(Criteria.where("studentId").is(student.getId()));
+        }
+        if (id != null && !id.isBlank()) {
+            attCriteria.add(Criteria.where("studentId").is(id.trim()));
+        }
         if (student.getRollNo() != null && !student.getRollNo().isBlank()) {
-            attCriteria.add(Criteria.where("studentId").is(student.getRollNo().trim()));
+            String roll = student.getRollNo().trim();
+            attCriteria.add(Criteria.where("studentId").is(roll));
+            attCriteria.add(Criteria.where("studentId").regex("^" + Pattern.quote(roll) + "$", "i"));
         }
         Query attQuery = new Query(new Criteria().orOperator(attCriteria.toArray(new Criteria[0])));
 
@@ -429,16 +436,20 @@ public class StudentService {
         }
 
         if (attendanceRepository != null) {
-            attendanceRepository.deleteByStudentId(student.getId());
-            if (student.getRollNo() != null && !student.getRollNo().isBlank() && !student.getRollNo().equalsIgnoreCase(student.getId())) {
+            if (student.getId() != null) {
+                attendanceRepository.deleteByStudentId(student.getId());
+            }
+            if (student.getRollNo() != null && !student.getRollNo().isBlank()) {
                 attendanceRepository.deleteByStudentId(student.getRollNo().trim());
             }
         }
 
         // 3. Cascade delete all archived attendance records for this student
         if (archiveRepository != null) {
-            archiveRepository.deleteByStudentId(student.getId());
-            if (student.getRollNo() != null && !student.getRollNo().isBlank() && !student.getRollNo().equalsIgnoreCase(student.getId())) {
+            if (student.getId() != null) {
+                archiveRepository.deleteByStudentId(student.getId());
+            }
+            if (student.getRollNo() != null && !student.getRollNo().isBlank()) {
                 archiveRepository.deleteByStudentId(student.getRollNo().trim());
             }
         }

@@ -43,6 +43,24 @@ public class FirebaseAuthenticationFilter extends OncePerRequestFilter {
     private final ObjectProvider<StudentRepository> studentRepositoryProvider;
     private final CustomAuthenticationEntryPoint authenticationEntryPoint;
 
+    private static class CachedUserEntry {
+        final AuthenticatedUser authenticatedUser;
+        final long timestamp;
+
+        CachedUserEntry(AuthenticatedUser authenticatedUser) {
+            this.authenticatedUser = authenticatedUser;
+            this.timestamp = System.currentTimeMillis();
+        }
+
+        boolean isExpired(long ttlMs) {
+            return (System.currentTimeMillis() - timestamp) > ttlMs;
+        }
+    }
+
+    private final java.util.concurrent.ConcurrentHashMap<String, CachedUserEntry> userAuthCache =
+            new java.util.concurrent.ConcurrentHashMap<>();
+    private static final long AUTH_CACHE_TTL_MS = 2 * 60 * 1000L; // 2 minutes
+
     public FirebaseAuthenticationFilter(
             ObjectProvider<FirebaseAuth> firebaseAuthProvider,
             ObjectProvider<UserRepository> userRepositoryProvider,
@@ -72,6 +90,24 @@ public class FirebaseAuthenticationFilter extends OncePerRequestFilter {
             authenticationEntryPoint.commence(request, response,
                     new BadCredentialsException("Bearer token cannot be empty"));
             return;
+        }
+
+        CachedUserEntry cached = userAuthCache.get(token);
+        if (cached != null && !cached.isExpired(AUTH_CACHE_TTL_MS)) {
+            AuthenticatedUser authenticatedUser = cached.authenticatedUser;
+            UsernamePasswordAuthenticationToken authentication =
+                    new UsernamePasswordAuthenticationToken(authenticatedUser, null, authenticatedUser.getAuthorities());
+            authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+
+            SecurityContextHolder.getContext().setAuthentication(authentication);
+            request.setAttribute(AUTHENTICATED_USER_ATTR, authenticatedUser);
+
+            filterChain.doFilter(request, response);
+            return;
+        }
+
+        if (userAuthCache.size() > 500) {
+            userAuthCache.entrySet().removeIf(e -> e.getValue().isExpired(AUTH_CACHE_TTL_MS));
         }
 
         FirebaseAuth firebaseAuth = firebaseAuthProvider.getIfAvailable();
@@ -212,6 +248,7 @@ public class FirebaseAuthenticationFilter extends OncePerRequestFilter {
 
                     SecurityContextHolder.getContext().setAuthentication(authentication);
                     request.setAttribute(AUTHENTICATED_USER_ATTR, authenticatedUser);
+                    userAuthCache.put(token, new CachedUserEntry(authenticatedUser));
 
                     filterChain.doFilter(request, response);
                     return;
@@ -313,6 +350,7 @@ public class FirebaseAuthenticationFilter extends OncePerRequestFilter {
 
         SecurityContextHolder.getContext().setAuthentication(authentication);
         request.setAttribute(AUTHENTICATED_USER_ATTR, authenticatedUser);
+        userAuthCache.put(token, new CachedUserEntry(authenticatedUser));
 
         filterChain.doFilter(request, response);
     }

@@ -2,6 +2,7 @@ package com.ams.service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
@@ -19,6 +20,8 @@ import com.ams.dto.StudentResponse;
 import com.ams.exception.AccessDeniedException;
 import com.ams.exception.DuplicateResourceException;
 import com.ams.exception.ResourceNotFoundException;
+import com.ams.model.Attendance;
+import com.ams.model.AttendanceArchive;
 import com.ams.model.Course;
 import com.ams.model.Department;
 import com.ams.model.ProgramType;
@@ -139,9 +142,16 @@ public class StudentService {
         return new PageResponse<>(data, validatedPage, validatedSize, totalElements, totalPages);
     }
 
+    private final Map<String, List<String>> courseIdentifierCache = new java.util.concurrent.ConcurrentHashMap<>();
+    private final Map<String, List<String>> deptIdentifierCache = new java.util.concurrent.ConcurrentHashMap<>();
+
     public List<String> getMatchingCourseIdentifiers(String courseIdentifier) {
         if (courseIdentifier == null || courseIdentifier.isBlank()) return List.of();
         String trimmed = courseIdentifier.trim();
+        if (courseIdentifierCache.containsKey(trimmed)) {
+            return courseIdentifierCache.get(trimmed);
+        }
+
         List<String> ids = new ArrayList<>();
         ids.add(trimmed);
         try {
@@ -160,12 +170,18 @@ public class StudentService {
             }
         } catch (Exception ignored) {
         }
-        return ids.stream().distinct().toList();
+        List<String> distinctIds = ids.stream().distinct().toList();
+        courseIdentifierCache.put(trimmed, distinctIds);
+        return distinctIds;
     }
 
     public List<String> getMatchingDeptIdentifiers(String deptIdentifier) {
         if (deptIdentifier == null || deptIdentifier.isBlank()) return List.of();
         String trimmed = deptIdentifier.trim();
+        if (deptIdentifierCache.containsKey(trimmed)) {
+            return deptIdentifierCache.get(trimmed);
+        }
+
         List<String> ids = new ArrayList<>();
         ids.add(trimmed);
         try {
@@ -184,7 +200,9 @@ public class StudentService {
             }
         } catch (Exception ignored) {
         }
-        return ids.stream().distinct().toList();
+        List<String> distinctIds = ids.stream().distinct().toList();
+        deptIdentifierCache.put(trimmed, distinctIds);
+        return distinctIds;
     }
 
     public StudentResponse getStudentById(String id) {
@@ -396,10 +414,23 @@ public class StudentService {
                     .ifPresent(userRepository::delete);
         }
 
-        // 2. Cascade delete all attendance records for this student
+        // 2. Cascade delete all attendance records for this student across all identifier variations
+        List<Criteria> attCriteria = new ArrayList<>();
+        attCriteria.add(Criteria.where("studentId").is(student.getId()));
+        attCriteria.add(Criteria.where("studentId").is(id));
+        if (student.getRollNo() != null && !student.getRollNo().isBlank()) {
+            attCriteria.add(Criteria.where("studentId").is(student.getRollNo().trim()));
+        }
+        Query attQuery = new Query(new Criteria().orOperator(attCriteria.toArray(new Criteria[0])));
+
+        if (mongoTemplate != null) {
+            mongoTemplate.remove(attQuery, Attendance.class);
+            mongoTemplate.remove(attQuery, AttendanceArchive.class);
+        }
+
         if (attendanceRepository != null) {
             attendanceRepository.deleteByStudentId(student.getId());
-            if (student.getRollNo() != null && !student.getRollNo().isBlank()) {
+            if (student.getRollNo() != null && !student.getRollNo().isBlank() && !student.getRollNo().equalsIgnoreCase(student.getId())) {
                 attendanceRepository.deleteByStudentId(student.getRollNo().trim());
             }
         }
@@ -407,7 +438,7 @@ public class StudentService {
         // 3. Cascade delete all archived attendance records for this student
         if (archiveRepository != null) {
             archiveRepository.deleteByStudentId(student.getId());
-            if (student.getRollNo() != null && !student.getRollNo().isBlank()) {
+            if (student.getRollNo() != null && !student.getRollNo().isBlank() && !student.getRollNo().equalsIgnoreCase(student.getId())) {
                 archiveRepository.deleteByStudentId(student.getRollNo().trim());
             }
         }

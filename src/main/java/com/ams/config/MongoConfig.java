@@ -111,10 +111,20 @@ public class MongoConfig {
     @Primary
     public MongoClient mongoClient() {
         String sanitized = sanitizeMongoUri(rawUri);
-        log.info("Connecting to MongoDB with sanitized connection string...");
+        log.info("Connecting to MongoDB with sanitized connection string and tuned connection pool...");
         ConnectionString connString = new ConnectionString(sanitized);
         MongoClientSettings settings = MongoClientSettings.builder()
                 .applyConnectionString(connString)
+                .applyToConnectionPoolSettings(builder -> builder
+                        .maxSize(25)
+                        .minSize(2)
+                        .maxConnectionIdleTime(30, java.util.concurrent.TimeUnit.SECONDS)
+                        .maxConnectionLifeTime(10, java.util.concurrent.TimeUnit.MINUTES)
+                )
+                .applyToSocketSettings(builder -> builder
+                        .connectTimeout(5, java.util.concurrent.TimeUnit.SECONDS)
+                        .readTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+                )
                 .build();
         return MongoClients.create(settings);
     }

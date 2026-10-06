@@ -1,5 +1,6 @@
 package com.ams.repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -25,6 +26,12 @@ public interface StudentRepository extends MongoRepository<Student, String> {
     );
 
     List<Student> findByDepartmentIdAndActiveTrue(String departmentId);
+
+    List<Student> findByCourseIdInAndActiveTrue(Collection<String> courseIds);
+
+    List<Student> findByRollNoIn(Collection<String> rollNos);
+
+    long countByDepartmentIdAndActiveTrue(String departmentId);
 
     long countByActiveTrue();
 }

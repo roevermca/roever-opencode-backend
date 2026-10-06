@@ -1,12 +1,19 @@
 package com.ams.config;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Component;
 
+import com.ams.model.Attendance;
+import com.ams.model.AttendanceArchive;
 import com.ams.model.Course;
 import com.ams.model.Department;
 import com.ams.model.ProgramType;
@@ -27,16 +34,19 @@ public class DataInitializer implements CommandLineRunner {
     private final CourseRepository courseRepository;
     private final UserRepository userRepository;
     private final StudentRepository studentRepository;
+    private final MongoTemplate mongoTemplate;
 
     public DataInitializer(
             DepartmentRepository departmentRepository,
             CourseRepository courseRepository,
             UserRepository userRepository,
-            StudentRepository studentRepository) {
+            StudentRepository studentRepository,
+            MongoTemplate mongoTemplate) {
         this.departmentRepository = departmentRepository;
         this.courseRepository = courseRepository;
         this.userRepository = userRepository;
         this.studentRepository = studentRepository;
+        this.mongoTemplate = mongoTemplate;
     }
 
     @Override
@@ -167,6 +177,19 @@ public class DataInitializer implements CommandLineRunner {
         userRepository.findAll().forEach(u ->
             logger.info("AMS_USER_LOADED: email={}, role={}, active={}, id={}", u.getEmail(), u.getRole(), u.isActive(), u.getId())
         );
+
+        // 6. Purge any orphan attendance records left behind from previously deleted students
+        List<String> validStudentIds = studentRepository.findAll().stream().map(Student::getId).toList();
+        List<String> validRollNos = studentRepository.findAll().stream().map(Student::getRollNo).filter(r -> r != null && !r.isBlank()).toList();
+        Set<String> allValidIds = new HashSet<>(validStudentIds);
+        allValidIds.addAll(validRollNos);
+
+        Query orphanQuery = new Query(Criteria.where("studentId").nin(allValidIds));
+        long purgedAttendance = mongoTemplate.remove(orphanQuery, Attendance.class).getDeletedCount();
+        mongoTemplate.remove(orphanQuery, AttendanceArchive.class);
+        if (purgedAttendance > 0) {
+            logger.info("Purged {} orphan attendance records of deleted students on system startup", purgedAttendance);
+        }
 
         logger.info("Foundational Roever Arts & Science data check completed successfully.");
     }

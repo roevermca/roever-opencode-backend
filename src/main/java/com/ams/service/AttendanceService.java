@@ -3,6 +3,7 @@ package com.ams.service;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -11,6 +12,8 @@ import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -29,6 +32,7 @@ import com.ams.exception.AccessDeniedException;
 import com.ams.exception.DuplicateResourceException;
 import com.ams.exception.ResourceNotFoundException;
 import com.ams.model.Attendance;
+import com.ams.model.AttendanceArchive;
 import com.ams.model.AttendanceStatus;
 import com.ams.model.Course;
 import com.ams.model.Role;
@@ -40,6 +44,8 @@ import com.ams.security.SecurityUtils;
 
 @Service
 public class AttendanceService {
+
+    private static final Logger logger = LoggerFactory.getLogger(AttendanceService.class);
 
     private final AttendanceRepository attendanceRepository;
     private final StudentRepository studentRepository;
@@ -213,8 +219,7 @@ public class AttendanceService {
                             throw new AccessDeniedException("Forbidden: Staff can only view attendance for students in their assigned course (" + currentUser.getCourseId() + ")");
                         }
                     } else {
-                        List<String> courseStudentIds = studentRepository.findAll().stream()
-                                .filter(s -> s.isActive() && s.getCourseId() != null && allowedCourses.contains(s.getCourseId()))
+                        List<String> courseStudentIds = studentRepository.findByCourseIdInAndActiveTrue(allowedCourses).stream()
                                 .map(Student::getId).toList();
                         filters.add(Criteria.where("studentId").in(courseStudentIds));
                     }
@@ -258,9 +263,7 @@ public class AttendanceService {
         List<Attendance> attendanceList = mongoTemplate.find(query, Attendance.class);
         int totalPages = validatedSize > 0 ? (int) Math.ceil((double) totalElements / validatedSize) : 0;
 
-        List<AttendanceResponse> data = attendanceList.stream()
-                .map(AttendanceResponse::fromEntity)
-                .toList();
+        List<AttendanceResponse> data = enrichAttendanceResponses(attendanceList);
 
         return new PageResponse<>(data, validatedPage, validatedSize, totalElements, totalPages);
     }
@@ -292,9 +295,7 @@ public class AttendanceService {
         List<Attendance> list = mongoTemplate.find(query, Attendance.class);
         int totalPages = validatedSize > 0 ? (int) Math.ceil((double) totalElements / validatedSize) : 0;
 
-        List<AttendanceResponse> data = list.stream()
-                .map(AttendanceResponse::fromEntity)
-                .toList();
+        List<AttendanceResponse> data = enrichAttendanceResponses(list);
 
         return new PageResponse<>(data, validatedPage, validatedSize, totalElements, totalPages);
     }
@@ -334,9 +335,15 @@ public class AttendanceService {
         return AttendanceResponse.fromEntity(saved);
     }
 
+    private final Map<String, List<String>> courseIdentifierCache = new java.util.concurrent.ConcurrentHashMap<>();
+
     public List<String> getMatchingCourseIdentifiers(String courseIdentifier) {
         if (courseIdentifier == null || courseIdentifier.isBlank()) return List.of();
         String trimmed = courseIdentifier.trim();
+        if (courseIdentifierCache.containsKey(trimmed)) {
+            return courseIdentifierCache.get(trimmed);
+        }
+
         List<String> ids = new ArrayList<>();
         ids.add(trimmed);
         try {
@@ -355,6 +362,89 @@ public class AttendanceService {
             }
         } catch (Exception ignored) {
         }
-        return ids.stream().distinct().toList();
+        List<String> distinctIds = ids.stream().distinct().toList();
+        courseIdentifierCache.put(trimmed, distinctIds);
+        return distinctIds;
+    }
+
+    public long purgeOrphanAttendanceRecords() {
+        List<String> validStudentIds = studentRepository.findAll().stream().map(Student::getId).toList();
+        List<String> validRollNos = studentRepository.findAll().stream().map(Student::getRollNo).filter(r -> r != null && !r.isBlank()).toList();
+        Set<String> allValidIds = new HashSet<>(validStudentIds);
+        allValidIds.addAll(validRollNos);
+
+        Query orphanQuery = new Query(Criteria.where("studentId").nin(allValidIds));
+        long count = mongoTemplate.remove(orphanQuery, Attendance.class).getDeletedCount();
+        mongoTemplate.remove(orphanQuery, AttendanceArchive.class);
+        return count;
+    }
+
+    private List<AttendanceResponse> enrichAttendanceResponses(List<Attendance> attendanceList) {
+        if (attendanceList == null || attendanceList.isEmpty()) {
+            return List.of();
+        }
+
+        Set<String> studentIds = attendanceList.stream()
+                .map(Attendance::getStudentId)
+                .filter(id -> id != null && !id.isBlank())
+                .collect(Collectors.toSet());
+
+        Map<String, Student> studentMap = new HashMap<>();
+        if (!studentIds.isEmpty() && studentRepository != null) {
+            try {
+                // Find by primary MongoDB IDs
+                List<Student> studentsById = studentRepository.findAllById(studentIds);
+                if (studentsById != null) {
+                    for (Student s : studentsById) {
+                        if (s != null) {
+                            if (s.getId() != null) studentMap.put(s.getId(), s);
+                            if (s.getRollNo() != null) studentMap.put(s.getRollNo(), s);
+                        }
+                    }
+                }
+
+                // Also check for any IDs that might match roll numbers
+                Set<String> missingIds = studentIds.stream()
+                        .filter(id -> !studentMap.containsKey(id))
+                        .collect(Collectors.toSet());
+                if (!missingIds.isEmpty()) {
+                    List<Student> studentsByRoll = studentRepository.findByRollNoIn(missingIds);
+                    if (studentsByRoll != null) {
+                        for (Student s : studentsByRoll) {
+                            if (s != null) {
+                                if (s.getId() != null) studentMap.put(s.getId(), s);
+                                if (s.getRollNo() != null) studentMap.put(s.getRollNo(), s);
+                            }
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                logger.warn("Could not enrich attendance records with student details: {}", e.getMessage());
+            }
+        }
+
+        return attendanceList.stream().map(att -> {
+            Student stu = studentMap.get(att.getStudentId());
+            String name = (stu != null && stu.getName() != null) ? stu.getName() : null;
+            String rollNo = (stu != null && stu.getRollNo() != null) ? stu.getRollNo() : att.getStudentId();
+            String dept = (stu != null) ? stu.getDepartmentId() : null;
+            Integer yr = (stu != null) ? stu.getYear() : null;
+            String sec = (stu != null) ? stu.getSection() : null;
+
+            return new AttendanceResponse(
+                    att.getId(),
+                    att.getStudentId(),
+                    att.getDate(),
+                    att.getPeriod(),
+                    att.getStatus(),
+                    att.getMarkedBy(),
+                    att.getMarkedAt(),
+                    name,
+                    rollNo,
+                    dept,
+                    yr,
+                    sec
+            );
+        }).toList();
     }
 }

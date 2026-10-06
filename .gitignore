@@ -1,1 +1,25 @@
 target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+### IDEs & Editors ###
+.idea/
+*.iml
+.vscode/
+*.ipr
+*.iws
+
+### System & Logs ###
+*.log
+.DS_Store
+Thumbs.db
+
+### Dummy / accidental node files ###
+node_modules/
+package.json
+package-lock.json
+
+### Environment & local files ###
+.env
+*.local

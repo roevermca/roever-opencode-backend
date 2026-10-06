@@ -167,6 +167,7 @@ public class UserService {
                 request.getRole(),
                 request.getDepartmentId() != null ? request.getDepartmentId().trim() : null,
                 request.getCourseId() != null ? request.getCourseId().trim() : null,
+                request.getPhone() != null ? request.getPhone().trim() : null,
                 request.getActive() != null ? request.getActive() : true
         );
 
@@ -175,10 +176,23 @@ public class UserService {
     }
 
     public UserResponse updateUser(String id, UserRequest request) {
-        SecurityUtils.enforceStaffManagementAccess();
-
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + id));
+
+        AuthenticatedUser currentUser = SecurityUtils.getCurrentUser();
+        if (currentUser != null) {
+            boolean isSelf = (currentUser.getUserId() != null && currentUser.getUserId().equals(id))
+                    || (currentUser.getEmail() != null && user.getEmail() != null && currentUser.getEmail().equalsIgnoreCase(user.getEmail()));
+            boolean isAdminOrVp = currentUser.getRole() == Role.ADMIN || currentUser.getRole() == Role.VP;
+            if (!isSelf && !isAdminOrVp) {
+                throw new AccessDeniedException("Forbidden: Only ADMIN, VP, or the account owner can update account details");
+            }
+            if (!isAdminOrVp) {
+                // Non-admin self-update: preserve role and active status
+                request.setRole(user.getRole());
+                request.setActive(user.isActive());
+            }
+        }
 
         if (request.getRole() == Role.VP) {
             boolean isActivating = request.getActive() == null || Boolean.TRUE.equals(request.getActive());
@@ -201,12 +215,19 @@ public class UserService {
         user.setRole(request.getRole());
         user.setDepartmentId(request.getDepartmentId() != null ? request.getDepartmentId().trim() : null);
         user.setCourseId(request.getCourseId() != null ? request.getCourseId().trim() : null);
+        if (request.getPhone() != null) {
+            user.setPhone(request.getPhone().trim());
+        }
         if (request.getActive() != null) {
             user.setActive(request.getActive());
         }
 
         User updated = userRepository.save(user);
         return UserResponse.fromEntity(updated);
+    }
+
+    public Optional<User> findUserEntityById(String id) {
+        return userRepository.findById(id);
     }
 
     public void deleteUser(String id) {

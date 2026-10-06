@@ -18,9 +18,16 @@ import com.ams.dto.StudentRequest;
 import com.ams.dto.StudentResponse;
 import com.ams.exception.DuplicateResourceException;
 import com.ams.model.ProgramType;
+import com.ams.model.Role;
 import com.ams.model.Student;
+import com.ams.model.User;
+import com.ams.repository.AttendanceArchiveRepository;
+import com.ams.repository.AttendanceRepository;
 import com.ams.repository.StudentRepository;
 import com.ams.repository.UserRepository;
+import java.util.Optional;
+
+
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -41,8 +48,15 @@ class StudentServiceTest {
     @Mock
     private MongoTemplate mongoTemplate;
 
+    @Mock
+    private AttendanceRepository attendanceRepository;
+
+    @Mock
+    private AttendanceArchiveRepository archiveRepository;
+
     @InjectMocks
     private StudentService studentService;
+
 
     private StudentRequest studentRequest;
     private Student student;
@@ -136,4 +150,22 @@ class StudentServiceTest {
         assertThat(pageResponse.getTotalElements()).isEqualTo(45L);
         assertThat(pageResponse.getTotalPages()).isEqualTo(3);
     }
+
+    @Test
+    @DisplayName("deleteStudent cascades deletion to User, Attendance, and Archive repositories")
+    void deleteStudent_cascadeSuccess() {
+        given(studentRepository.findById("std-123")).willReturn(Optional.of(student));
+        User user = new User("std-123", "Aarav", "aarav@amsportal.edu", Role.STUDENT, "dept-cs-01", true);
+        given(userRepository.findByEmail("aarav@amsportal.edu")).willReturn(Optional.of(user));
+
+        studentService.deleteStudent("std-123");
+
+        verify(userRepository).delete(user);
+        verify(attendanceRepository).deleteByStudentId("std-123");
+        verify(attendanceRepository).deleteByStudentId("2024CS101");
+        verify(archiveRepository).deleteByStudentId("std-123");
+        verify(archiveRepository).deleteByStudentId("2024CS101");
+        verify(studentRepository).delete(student);
+    }
 }
+

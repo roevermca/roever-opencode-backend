@@ -3,9 +3,12 @@ package com.ams.service;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -213,10 +216,23 @@ public class ReportService {
         Map<String, List<StudentReportResponse>> byDept = studentReports.stream()
                 .collect(Collectors.groupingBy(StudentReportResponse::getDepartmentId));
 
-        return byDept.entrySet().stream().map(entry -> {
-            String deptId = entry.getKey();
-            List<StudentReportResponse> list = entry.getValue();
-            String deptName = list.isEmpty() ? deptId : list.get(0).getDepartmentName();
+        List<Department> activeDepts = departmentRepository.findByActiveTrue();
+        String scopedDeptId = resolveDepartmentId(departmentId);
+        if (scopedDeptId != null && !scopedDeptId.isBlank()) {
+            activeDepts = activeDepts.stream().filter(d -> d.getId().equals(scopedDeptId)).toList();
+        }
+
+        Map<String, Department> deptMap = activeDepts != null
+                ? activeDepts.stream().collect(Collectors.toMap(Department::getId, d -> d, (a, b) -> a))
+                : Collections.emptyMap();
+
+        Set<String> allDeptIds = new LinkedHashSet<>(deptMap.keySet());
+        allDeptIds.addAll(byDept.keySet());
+
+        return allDeptIds.stream().map(deptId -> {
+            List<StudentReportResponse> list = byDept.getOrDefault(deptId, Collections.emptyList());
+            Department deptObj = deptMap.get(deptId);
+            String deptName = deptObj != null ? deptObj.getName() : (list.isEmpty() ? deptId : list.get(0).getDepartmentName());
             long totalStudents = list.size();
             long present = list.stream().mapToLong(StudentReportResponse::getPresent).sum();
             long absent = list.stream().mapToLong(StudentReportResponse::getAbsent).sum();
@@ -232,7 +248,7 @@ public class ReportService {
                     total,
                     rate
             );
-        }).toList();
+        }).sorted(Comparator.comparing(DepartmentReportResponse::getDepartment)).toList();
     }
 
     public List<StudentReportResponse> getLowAttendanceReports(

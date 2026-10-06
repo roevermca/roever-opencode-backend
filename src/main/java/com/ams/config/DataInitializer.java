@@ -139,25 +139,30 @@ public class DataInitializer implements CommandLineRunner {
         seedCourse("B.Sc Hotel Management & Catering Science", "BSC-HMCS", hmcs.getId(), ProgramType.UG, 3);
         seedCourse("B.Sc Physical Education", "BSC-PED", ped.getId(), ProgramType.UG, 3);
 
-        // 4. Seed Foundational Accounts (Roever Master Admin, VP, HOD, Faculty, Student)
-        seedUser("firebase-admin-01", "Dr. Rajesh Sharma", "admin@amsportal.edu", Role.ADMIN, adminDept.getId());
+        // 4. Clean up any legacy mock/default accounts and dummy students
+        List<String> legacyMockEmails = List.of(
+            "admin@amsportal.edu",
+            "vp@amsportal.edu",
+            "hod.cs@amsportal.edu",
+            "staff@amsportal.edu",
+            "student@amsportal.edu",
+            "priya.mca@amsportal.edu"
+        );
+        for (String mockEmail : legacyMockEmails) {
+            userRepository.findByEmail(mockEmail).ifPresent(u -> {
+                userRepository.delete(u);
+                logger.info("Removed legacy mock account: {}", mockEmail);
+            });
+            studentRepository.findByEmail(mockEmail).ifPresent(s -> {
+                studentRepository.delete(s);
+                logger.info("Removed legacy mock student: {}", mockEmail);
+            });
+        }
+        studentRepository.findByRollNo("23CA001").ifPresent(studentRepository::delete);
+        studentRepository.findByRollNo("23MCA001").ifPresent(studentRepository::delete);
+
+        // 5. Ensure System Master Admin exists ONLY if not already present (never overwrite user edits)
         seedUser("firebase-admin-master", "Roever Administrator", "roevermca09@gmail.com", Role.ADMIN, adminDept.getId());
-        seedUser("firebase-vp-01", "Prof. K. Narayanan", "vp@amsportal.edu", Role.VP, adminDept.getId());
-        seedUser("firebase-hod-01", "Dr. S. Venkatesh", "hod.cs@amsportal.edu", Role.HOD, ca.getId());
-        seedUser("firebase-staff-01", "Mrs. Anitha R (MCA Faculty)", "staff@amsportal.edu", Role.STAFF, ca.getId(), mca.getId());
-        seedUser("firebase-student-01", "Aravind Kumar (BCA)", "student@amsportal.edu", Role.STUDENT, ca.getId(), bca.getId());
-
-        if (studentRepository.findByEmail("student@amsportal.edu").isEmpty()) {
-            Student s = new Student("23CA001", "Aravind Kumar", "student@amsportal.edu", "9876543210", ca.getId(), bca.getId(), ProgramType.UG, 2, "A", true);
-            studentRepository.save(s);
-            logger.info("Created foundational student record for student@amsportal.edu in BCA");
-        }
-
-        if (studentRepository.findByEmail("priya.mca@amsportal.edu").isEmpty()) {
-            Student s2 = new Student("23MCA001", "Priya V", "priya.mca@amsportal.edu", "9876543211", ca.getId(), mca.getId(), ProgramType.PG, 1, "A", true);
-            studentRepository.save(s2);
-            logger.info("Created foundational student record for priya.mca@amsportal.edu in MCA");
-        }
 
         userRepository.findAll().forEach(u ->
             logger.info("AMS_USER_LOADED: email={}, role={}, active={}, id={}", u.getEmail(), u.getRole(), u.isActive(), u.getId())
@@ -168,39 +173,11 @@ public class DataInitializer implements CommandLineRunner {
 
     private Department seedDept(String name, String code) {
         return departmentRepository.findByCode(code)
-                .map(existing -> {
-                    boolean updated = false;
-                    if (!name.equalsIgnoreCase(existing.getName())) {
-                        existing.setName(name);
-                        updated = true;
-                    }
-                    if (!existing.isActive()) {
-                        existing.setActive(true);
-                        updated = true;
-                    }
-                    return updated ? departmentRepository.save(existing) : existing;
-                })
                 .orElseGet(() -> departmentRepository.save(new Department(name, code, true)));
     }
 
     private Course seedCourse(String name, String code, String deptId, ProgramType type, int duration) {
         return courseRepository.findByCode(code)
-                .map(existing -> {
-                    boolean updated = false;
-                    if (!name.equalsIgnoreCase(existing.getName())) {
-                        existing.setName(name);
-                        updated = true;
-                    }
-                    if (!deptId.equals(existing.getDepartmentId())) {
-                        existing.setDepartmentId(deptId);
-                        updated = true;
-                    }
-                    if (!existing.isActive()) {
-                        existing.setActive(true);
-                        updated = true;
-                    }
-                    return updated ? courseRepository.save(existing) : existing;
-                })
                 .orElseGet(() -> courseRepository.save(new Course(name, code, deptId, type, duration, true)));
     }
 
@@ -210,35 +187,10 @@ public class DataInitializer implements CommandLineRunner {
 
     private void seedUser(String uid, String name, String email, Role role, String deptId, String courseId) {
         String normalized = email.toLowerCase().trim();
-        userRepository.findByEmail(normalized).ifPresentOrElse(
-            existing -> {
-                boolean changed = false;
-                if (existing.getRole() != role) {
-                    existing.setRole(role);
-                    changed = true;
-                }
-                if (deptId != null && !deptId.equals(existing.getDepartmentId())) {
-                    existing.setDepartmentId(deptId);
-                    changed = true;
-                }
-                if (courseId != null && !courseId.equals(existing.getCourseId())) {
-                    existing.setCourseId(courseId);
-                    changed = true;
-                }
-                if (!existing.isActive()) {
-                    existing.setActive(true);
-                    changed = true;
-                }
-                if (changed) {
-                    userRepository.save(existing);
-                    logger.info("Updated existing system user {} to role {}, course {}", normalized, role, courseId);
-                }
-            },
-            () -> {
-                User user = new User(uid, name, normalized, role, deptId, courseId, true);
-                userRepository.save(user);
-                logger.info("Created foundational system account: {} with role {}, course {}", normalized, role, courseId);
-            }
-        );
+        if (userRepository.findByEmail(normalized).isEmpty()) {
+            User user = new User(uid, name, normalized, role, deptId, courseId, true);
+            userRepository.save(user);
+            logger.info("Created system admin account: {} with role {}", normalized, role);
+        }
     }
 }

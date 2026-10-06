@@ -39,15 +39,33 @@ public class UserController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(java.util.Map.of("message", "User is not authenticated"));
         }
+
+        String phone = "";
+        String name = user.getName() != null ? user.getName() : user.getEmail();
+        String deptId = user.getDepartmentId() != null ? user.getDepartmentId() : "";
+        String courseId = user.getCourseId() != null ? user.getCourseId() : "";
+
+        if (user.getUserId() != null) {
+            var dbUserOpt = userService.findUserEntityById(user.getUserId());
+            if (dbUserOpt.isPresent()) {
+                var dbUser = dbUserOpt.get();
+                if (dbUser.getPhone() != null) phone = dbUser.getPhone();
+                if (dbUser.getName() != null) name = dbUser.getName();
+                if (dbUser.getDepartmentId() != null) deptId = dbUser.getDepartmentId();
+                if (dbUser.getCourseId() != null) courseId = dbUser.getCourseId();
+            }
+        }
+
         java.util.Map<String, Object> response = new java.util.HashMap<>();
         response.put("id", user.getUserId() != null ? user.getUserId() : user.getEmail());
         response.put("firebaseUid", user.getFirebaseUid());
-        response.put("name", user.getName() != null ? user.getName() : user.getEmail());
+        response.put("name", name);
         response.put("email", user.getEmail());
-        response.put("displayName", user.getName() != null ? user.getName() : user.getEmail());
+        response.put("phone", phone);
+        response.put("displayName", name);
         response.put("role", user.getRole() != null ? user.getRole().name() : "STAFF");
-        response.put("departmentId", user.getDepartmentId() != null ? user.getDepartmentId() : "");
-        response.put("courseId", user.getCourseId() != null ? user.getCourseId() : "");
+        response.put("departmentId", deptId);
+        response.put("courseId", courseId);
         response.put("studentId", user.getStudentId() != null ? user.getStudentId() : "");
         response.put("active", true);
         return ResponseEntity.ok(response);

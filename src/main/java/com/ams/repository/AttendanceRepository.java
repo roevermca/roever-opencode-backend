@@ -33,4 +33,18 @@ public interface AttendanceRepository extends MongoRepository<Attendance, String
     long countByStudentIdAndStatus(String studentId, AttendanceStatus status);
 
     List<Attendance> findByStudentIdInAndDateAndPeriod(Collection<String> studentIds, LocalDate date, int period);
+
+    long deleteByDateLessThanEqual(LocalDate date);
+
+    Optional<Attendance> findFirstByOrderByDateAsc();
+
+    Optional<Attendance> findFirstByOrderByDateDesc();
+
+    long countByDateLessThanEqual(LocalDate date);
+
+    List<Attendance> findByDateLessThanEqual(LocalDate date);
+
+    long deleteByStudentId(String studentId);
 }
+
+

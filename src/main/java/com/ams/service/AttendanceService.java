@@ -99,42 +99,59 @@ public class AttendanceService {
             }
         }
 
-        // 3. Prevent duplicate attendance and enforce locked state for STAFF
-        List<Attendance> existingRecords = attendanceRepository.findByStudentIdInAndDateAndPeriod(
-                studentIds, request.getDate(), request.getPeriod()
-        );
-
-        if (!existingRecords.isEmpty()) {
-            if (currentUser != null && currentUser.getRole() == Role.STAFF) {
-                throw new DuplicateResourceException(
-                        "Attendance has already been submitted and locked for period " + request.getPeriod() +
-                        " on " + request.getDate() + ". Staff cannot edit submitted attendance.");
+        boolean isFullDay = Boolean.TRUE.equals(request.getFullDay());
+        List<Integer> periodsToMark;
+        if (isFullDay) {
+            periodsToMark = List.of(1, 2, 3, 4, 5);
+        } else {
+            if (request.getPeriod() == null || request.getPeriod() < 1 || request.getPeriod() > 5) {
+                throw new IllegalArgumentException("Period must be between 1 and 5 when not marking full day");
             }
-            throw new DuplicateResourceException(
-                    "Attendance already exists for " + existingRecords.size() +
-                    " student(s) on " + request.getDate() + " period " + request.getPeriod());
+            periodsToMark = List.of(request.getPeriod());
+        }
+
+        // 3. Prevent duplicate attendance and enforce locked state for STAFF
+        for (Integer p : periodsToMark) {
+            List<Attendance> existingRecords = attendanceRepository.findByStudentIdInAndDateAndPeriod(
+                    studentIds, request.getDate(), p
+            );
+
+            if (!existingRecords.isEmpty()) {
+                if (currentUser != null && currentUser.getRole() == Role.STAFF) {
+                    throw new DuplicateResourceException(
+                            "Attendance has already been submitted and locked for period " + p +
+                            " on " + request.getDate() + ". Staff cannot edit submitted attendance.");
+                }
+                throw new DuplicateResourceException(
+                        "Attendance already exists for " + existingRecords.size() +
+                        " student(s) on " + request.getDate() + " period " + p);
+            }
         }
 
         // 4. Server-generated timestamp and batch creation
         Instant markedAt = Instant.now();
-        List<Attendance> toInsert = new ArrayList<>(records.size());
+        List<Attendance> toInsert = new ArrayList<>(records.size() * periodsToMark.size());
         int presentCount = 0;
         int absentCount = 0;
 
-        for (StudentAttendanceRecord record : records) {
-            if (record.getStatus() == AttendanceStatus.PRESENT || record.getStatus() == AttendanceStatus.ON_DUTY) {
-                presentCount++;
-            } else {
-                absentCount++;
+        for (Integer p : periodsToMark) {
+            for (StudentAttendanceRecord record : records) {
+                if (p == 1) {
+                    if (record.getStatus() == AttendanceStatus.PRESENT || record.getStatus() == AttendanceStatus.ON_DUTY) {
+                        presentCount++;
+                    } else {
+                        absentCount++;
+                    }
+                }
+                toInsert.add(new Attendance(
+                        record.getStudentId(),
+                        request.getDate(),
+                        p,
+                        record.getStatus(),
+                        markedBy,
+                        markedAt
+                ));
             }
-            toInsert.add(new Attendance(
-                    record.getStudentId(),
-                    request.getDate(),
-                    request.getPeriod(),
-                    record.getStatus(),
-                    markedBy,
-                    markedAt
-            ));
         }
 
         // Single bulk insert operation
@@ -142,14 +159,17 @@ public class AttendanceService {
 
         return new BulkAttendanceResponse(
                 true,
-                "Attendance successfully recorded for period " + request.getPeriod() + " on " + request.getDate(),
+                isFullDay
+                        ? "Attendance successfully recorded for full day (Periods 1–5) on " + request.getDate()
+                        : "Attendance successfully recorded for period " + request.getPeriod() + " on " + request.getDate(),
                 request.getDate(),
-                request.getPeriod(),
+                isFullDay ? 0 : request.getPeriod(),
                 toInsert.size(),
                 presentCount,
                 absentCount
         );
     }
+
 
     public PageResponse<AttendanceResponse> getAttendanceHistory(
             String studentId,

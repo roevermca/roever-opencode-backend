@@ -88,9 +88,10 @@ public final class SecurityUtils {
             return;
         }
         Role role = user.getRole();
-        if (role == Role.ADMIN || role == Role.VP) {
+        if (role == Role.ADMIN || role == Role.VP || role == Role.STAFF) {
             return;
         }
+
         if (role == Role.HOD) {
             if (user.getDepartmentId() != null && user.getDepartmentId().equals(studentDepartmentId)) {
                 return;
@@ -186,5 +187,17 @@ public final class SecurityUtils {
             throw new AccessDeniedException("Forbidden: " + role + " is not permitted to access reports");
         }
     }
+
+    public static void enforceSystemAdminAccess() {
+        AuthenticatedUser user = getCurrentUser();
+        if (user == null) {
+            return;
+        }
+        Role role = user.getRole();
+        if (role != Role.ADMIN && role != Role.VP) {
+            throw new AccessDeniedException("Forbidden: Only ADMIN or VP can view system storage metrics or perform data cleanup");
+        }
+    }
 }
+
 

@@ -12,16 +12,21 @@ public class UserResponse {
     private Role role;
     private String departmentId;
     private String courseId;
+    private String phone;
     private boolean active;
 
     public UserResponse() {
     }
 
     public UserResponse(String id, String firebaseUid, String name, String email, Role role, String departmentId, boolean active) {
-        this(id, firebaseUid, name, email, role, departmentId, null, active);
+        this(id, firebaseUid, name, email, role, departmentId, null, null, active);
     }
 
     public UserResponse(String id, String firebaseUid, String name, String email, Role role, String departmentId, String courseId, boolean active) {
+        this(id, firebaseUid, name, email, role, departmentId, courseId, null, active);
+    }
+
+    public UserResponse(String id, String firebaseUid, String name, String email, Role role, String departmentId, String courseId, String phone, boolean active) {
         this.id = id;
         this.firebaseUid = firebaseUid;
         this.name = name;
@@ -29,6 +34,7 @@ public class UserResponse {
         this.role = role;
         this.departmentId = departmentId;
         this.courseId = courseId;
+        this.phone = phone;
         this.active = active;
     }
 
@@ -41,6 +47,7 @@ public class UserResponse {
                 user.getRole(),
                 user.getDepartmentId(),
                 user.getCourseId(),
+                user.getPhone(),
                 user.isActive()
         );
     }
@@ -99,6 +106,14 @@ public class UserResponse {
 
     public void setCourseId(String courseId) {
         this.courseId = courseId;
+    }
+
+    public String getPhone() {
+        return phone;
+    }
+
+    public void setPhone(String phone) {
+        this.phone = phone;
     }
 
     public boolean isActive() {

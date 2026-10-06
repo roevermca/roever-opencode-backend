@@ -25,6 +25,8 @@ import com.ams.model.ProgramType;
 import com.ams.model.Role;
 import com.ams.model.Student;
 import com.ams.model.User;
+import com.ams.repository.AttendanceArchiveRepository;
+import com.ams.repository.AttendanceRepository;
 import com.ams.repository.StudentRepository;
 import com.ams.repository.UserRepository;
 import com.ams.security.AuthenticatedUser;
@@ -36,12 +38,21 @@ public class StudentService {
     private final StudentRepository studentRepository;
     private final UserRepository userRepository;
     private final MongoTemplate mongoTemplate;
+    private final AttendanceRepository attendanceRepository;
+    private final AttendanceArchiveRepository archiveRepository;
 
-    public StudentService(StudentRepository studentRepository, UserRepository userRepository, MongoTemplate mongoTemplate) {
+    public StudentService(StudentRepository studentRepository,
+                          UserRepository userRepository,
+                          MongoTemplate mongoTemplate,
+                          AttendanceRepository attendanceRepository,
+                          AttendanceArchiveRepository archiveRepository) {
         this.studentRepository = studentRepository;
         this.userRepository = userRepository;
         this.mongoTemplate = mongoTemplate;
+        this.attendanceRepository = attendanceRepository;
+        this.archiveRepository = archiveRepository;
     }
+
 
     public PageResponse<StudentResponse> getStudents(
             String departmentId,
@@ -378,10 +389,31 @@ public class StudentService {
         Student student = studentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Student not found with ID: " + id));
         SecurityUtils.enforceStudentWriteAccess(student.getDepartmentId());
+
+        // 1. Delete associated User account
         if (student.getEmail() != null && !student.getEmail().isBlank()) {
             userRepository.findByEmail(student.getEmail().trim().toLowerCase())
                     .ifPresent(userRepository::delete);
         }
+
+        // 2. Cascade delete all attendance records for this student
+        if (attendanceRepository != null) {
+            attendanceRepository.deleteByStudentId(student.getId());
+            if (student.getRollNo() != null && !student.getRollNo().isBlank()) {
+                attendanceRepository.deleteByStudentId(student.getRollNo().trim());
+            }
+        }
+
+        // 3. Cascade delete all archived attendance records for this student
+        if (archiveRepository != null) {
+            archiveRepository.deleteByStudentId(student.getId());
+            if (student.getRollNo() != null && !student.getRollNo().isBlank()) {
+                archiveRepository.deleteByStudentId(student.getRollNo().trim());
+            }
+        }
+
+        // 4. Delete the student entity
         studentRepository.delete(student);
     }
 }
+

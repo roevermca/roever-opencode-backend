@@ -1,5 +1,9 @@
 server:
   port: ${PORT:${SERVER_PORT:8080}}
+  compression:
+    enabled: true
+    mime-types: text/html,text/xml,text/plain,text/css,text/javascript,application/javascript,application/json
+    min-response-size: 512
 
 spring:
   application:
@@ -24,3 +28,10 @@ logging:
     root: INFO
     com.ams: INFO
     org.springframework.data.mongodb: INFO
+
+ams:
+  storage:
+    max-quota-bytes: ${STORAGE_MAX_QUOTA_BYTES:536870912} # 512 MB MongoDB Atlas Free Sandbox
+    cleanup-threshold-percent: ${STORAGE_CLEANUP_THRESHOLD:80.0} # 80% trigger
+    target-threshold-percent: ${STORAGE_TARGET_THRESHOLD:70.0} # 70% safe target
+    retention-min-days: ${STORAGE_RETENTION_MIN_DAYS:90} # Current semester protection (90 days)

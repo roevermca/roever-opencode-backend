@@ -148,4 +148,41 @@ public class ReportServiceTest {
                 reportService.getOverallReport(null, null, null, null, null, null, null)
         );
     }
+
+    @Test
+    void testGetDepartmentReports_IncludesActiveDepartmentsWithStudentCounts() {
+        Department dept1 = new Department("Computer Applications", "CA", true);
+        dept1.setId("dept-ca");
+        Department dept2 = new Department("Commerce", "COM", true);
+        dept2.setId("dept-com");
+
+        when(departmentRepository.findByActiveTrue()).thenReturn(List.of(dept1, dept2));
+
+        Student student1 = new Student("23CA001", "Student One", "s1@ams.edu", "123", "dept-ca", "crs-ca", ProgramType.UG, 1, "A", true);
+        student1.setId("stu-1");
+
+        when(mongoTemplate.find(any(Query.class), eq(Student.class))).thenReturn(List.of(student1));
+        when(departmentRepository.findById("dept-ca")).thenReturn(Optional.of(dept1));
+
+        Attendance att1 = new Attendance("stu-1", LocalDate.now(), 1, AttendanceStatus.PRESENT, "staff-1", Instant.now());
+        when(mongoTemplate.find(any(Query.class), eq(Attendance.class))).thenReturn(List.of(att1));
+
+        List<DepartmentReportResponse> reports = reportService.getDepartmentReports(null, null, null, null, null, null, null);
+
+        assertNotNull(reports);
+        assertEquals(2, reports.size());
+
+        // Commerce has 0 students enrolled
+        DepartmentReportResponse comDept = reports.stream().filter(r -> r.getDepartmentId().equals("dept-com")).findFirst().orElseThrow();
+        assertEquals("Commerce", comDept.getDepartment());
+        assertEquals(0, comDept.getTotalStudents());
+        assertEquals(0.0, comDept.getAttendanceRate());
+
+        // Computer Applications has 1 student enrolled with 100% rate
+        DepartmentReportResponse caDept = reports.stream().filter(r -> r.getDepartmentId().equals("dept-ca")).findFirst().orElseThrow();
+        assertEquals("Computer Applications", caDept.getDepartment());
+        assertEquals(1, caDept.getTotalStudents());
+        assertEquals(1, caDept.getPresent());
+        assertEquals(100.0, caDept.getAttendanceRate());
+    }
 }

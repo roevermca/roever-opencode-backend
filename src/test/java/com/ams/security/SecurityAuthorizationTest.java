@@ -164,18 +164,23 @@ class SecurityAuthorizationTest {
     }
 
     @Test
-    @DisplayName("STAFF management access is completely blocked")
-    void staffManagementAccess_blocked() {
+    @DisplayName("STAFF can create students but cannot manage staff accounts")
+    void staffManagementAccess_allowedForStudents_blockedForStaffUsers() {
         setSecurityContext("staff-1", Role.STAFF, "dept-cs", null);
 
         StudentRequest studentRequest = new StudentRequest("2024CS103", "Student", "s3@ams.edu",
                 "1234567890", "dept-cs", "course-cs", ProgramType.UG, 1, "A", true);
+        Student student = new Student("2024CS103", "Student", "s3@ams.edu",
+                "1234567890", "dept-cs", "course-cs", ProgramType.UG, 1, "A", true);
+        student.setId("std-103");
+        given(studentRepository.save(any())).willReturn(student);
 
-        assertThrows(AccessDeniedException.class, () -> studentService.createStudent(studentRequest));
+        assertDoesNotThrow(() -> studentService.createStudent(studentRequest));
 
         UserRequest userRequest = new UserRequest("fb-uid-2", "Staff 2", "s2@ams.edu", Role.STAFF, "dept-cs", true);
         assertThrows(AccessDeniedException.class, () -> userService.createUser(userRequest));
     }
+
 
     @Test
     @DisplayName("STUDENT accessing another student's data is blocked")

@@ -117,6 +117,45 @@ class AttendanceServiceTest {
     }
 
     @Test
+    @DisplayName("Bulk attendance with fullDay=true successfully records all 5 periods")
+    void markAttendanceBulk_fullDay_success() {
+        setSecurityContext("staff-1", Role.STAFF, "dept-cs", null);
+
+        Student s1 = new Student("2024CS101", "Student 1", "s1@ams.edu", "1234567890",
+                "dept-cs", "course-cs", ProgramType.UG, 1, "A", true);
+        s1.setId("std-1");
+        Student s2 = new Student("2024CS102", "Student 2", "s2@ams.edu", "1234567890",
+                "dept-cs", "course-cs", ProgramType.UG, 1, "A", true);
+        s2.setId("std-2");
+
+        given(studentRepository.findAllById(anyCollection())).willReturn(List.of(s1, s2));
+        for (int p = 1; p <= 5; p++) {
+            given(attendanceRepository.findByStudentIdInAndDateAndPeriod(anyCollection(), any(), eq(p)))
+                    .willReturn(List.of());
+        }
+
+        BulkAttendanceRequest request = new BulkAttendanceRequest(
+                LocalDate.of(2026, 10, 2),
+                null,
+                true,
+                List.of(
+                        new StudentAttendanceRecord("std-1", AttendanceStatus.PRESENT),
+                        new StudentAttendanceRecord("std-2", AttendanceStatus.ABSENT)
+                )
+        );
+
+        BulkAttendanceResponse response = attendanceService.markAttendanceBulk(request);
+
+        assertThat(response.isSuccess()).isTrue();
+        assertThat(response.getMessage()).contains("full day (Periods 1–5)");
+        assertThat(response.getTotalMarked()).isEqualTo(10); // 2 students * 5 periods = 10
+        assertThat(response.getPresentCount()).isEqualTo(1);
+        assertThat(response.getAbsentCount()).isEqualTo(1);
+        verify(mongoTemplate).insert(anyList(), eq(Attendance.class));
+    }
+
+
+    @Test
     @DisplayName("Duplicate attendance prevention throws DuplicateResourceException")
     void markAttendanceBulk_duplicatePrevention() {
         setSecurityContext("staff-1", Role.STAFF, "dept-cs", null);
@@ -201,6 +240,7 @@ class AttendanceServiceTest {
         given(studentRepository.findById("std-101")).willReturn(Optional.of(student));
         given(attendanceRepository.countByStudentId("std-101")).willReturn(40L);
         given(attendanceRepository.countByStudentIdAndStatus("std-101", AttendanceStatus.PRESENT)).willReturn(34L);
+        given(attendanceRepository.countByStudentIdAndStatus("std-101", AttendanceStatus.ON_DUTY)).willReturn(0L);
         given(attendanceRepository.countByStudentIdAndStatus("std-101", AttendanceStatus.ABSENT)).willReturn(6L);
 
         AttendanceSummaryResponse summary = attendanceService.getStudentAttendanceSummary("std-101");

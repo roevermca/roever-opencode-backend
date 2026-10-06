@@ -36,22 +36,29 @@ public class User {
     @Indexed
     private String courseId;
 
+    private String phone;
+
     private boolean active = true;
 
     public User() {
     }
 
     public User(String firebaseUid, String name, String email, Role role, String departmentId, boolean active) {
-        this(firebaseUid, name, email, role, departmentId, null, active);
+        this(firebaseUid, name, email, role, departmentId, null, null, active);
     }
 
     public User(String firebaseUid, String name, String email, Role role, String departmentId, String courseId, boolean active) {
+        this(firebaseUid, name, email, role, departmentId, courseId, null, active);
+    }
+
+    public User(String firebaseUid, String name, String email, Role role, String departmentId, String courseId, String phone, boolean active) {
         this.firebaseUid = firebaseUid;
         this.name = name;
         this.email = email;
         this.role = role;
         this.departmentId = departmentId;
         this.courseId = courseId;
+        this.phone = phone;
         this.active = active;
     }
 
@@ -109,6 +116,14 @@ public class User {
 
     public void setCourseId(String courseId) {
         this.courseId = courseId;
+    }
+
+    public String getPhone() {
+        return phone;
+    }
+
+    public void setPhone(String phone) {
+        this.phone = phone;
     }
 
     public boolean isActive() {

@@ -24,22 +24,29 @@ public class UserRequest {
 
     private String courseId;
 
+    private String phone;
+
     private Boolean active = true;
 
     public UserRequest() {
     }
 
     public UserRequest(String firebaseUid, String name, String email, Role role, String departmentId, Boolean active) {
-        this(firebaseUid, name, email, role, departmentId, null, active);
+        this(firebaseUid, name, email, role, departmentId, null, null, active);
     }
 
     public UserRequest(String firebaseUid, String name, String email, Role role, String departmentId, String courseId, Boolean active) {
+        this(firebaseUid, name, email, role, departmentId, courseId, null, active);
+    }
+
+    public UserRequest(String firebaseUid, String name, String email, Role role, String departmentId, String courseId, String phone, Boolean active) {
         this.firebaseUid = firebaseUid;
         this.name = name;
         this.email = email;
         this.role = role;
         this.departmentId = departmentId;
         this.courseId = courseId;
+        this.phone = phone;
         this.active = active != null ? active : true;
     }
 
@@ -89,6 +96,14 @@ public class UserRequest {
 
     public void setCourseId(String courseId) {
         this.courseId = courseId;
+    }
+
+    public String getPhone() {
+        return phone;
+    }
+
+    public void setPhone(String phone) {
+        this.phone = phone;
     }
 
     public Boolean getActive() {

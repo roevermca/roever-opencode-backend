@@ -51,7 +51,8 @@ public class DataInitializer implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
-        logger.info("Initializing/validating foundational data for Roever Arts & Science College in MongoDB...");
+        try {
+            logger.info("Initializing/validating foundational data for Roever Arts & Science College in MongoDB...");
 
         // 1. Deactivate legacy engineering departments and courses if previously created
         List<String> legacyEngineeringCodes = List.of("EEE", "ME", "CE", "CSE", "MBA");
@@ -210,6 +211,18 @@ public class DataInitializer implements CommandLineRunner {
         // 5. Ensure System Master Admin exists ONLY if not already present (never overwrite user edits)
         seedUser("firebase-admin-master", "Roever Administrator", "roevermca09@gmail.com", Role.ADMIN, adminDept.getId());
 
+        // Deduplicate any accidental multiple Master Admin entries from concurrent auto-heals
+        List<User> masterAdmins = userRepository.findAll().stream()
+                .filter(u -> u.getEmail() != null && "roevermca09@gmail.com".equalsIgnoreCase(u.getEmail().trim()))
+                .toList();
+        if (masterAdmins.size() > 1) {
+            logger.info("Found {} duplicate master admin records. Retaining primary and purging {} duplicates...",
+                    masterAdmins.size(), masterAdmins.size() - 1);
+            for (int i = 1; i < masterAdmins.size(); i++) {
+                userRepository.delete(masterAdmins.get(i));
+            }
+        }
+
         userRepository.findAll().forEach(u ->
             logger.info("AMS_USER_LOADED: email={}, role={}, active={}, id={}", u.getEmail(), u.getRole(), u.isActive(), u.getId())
         );
@@ -228,6 +241,9 @@ public class DataInitializer implements CommandLineRunner {
         }
 
         logger.info("Foundational Roever Arts & Science data check completed successfully.");
+        } catch (Exception e) {
+            logger.warn("Foundational data check deferred or MongoDB Atlas connection pending: {}", e.getMessage());
+        }
     }
 
     private Department seedDept(String name, String code) {

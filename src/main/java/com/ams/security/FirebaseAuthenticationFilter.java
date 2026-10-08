@@ -57,6 +57,7 @@ public class FirebaseAuthenticationFilter extends OncePerRequestFilter {
         }
     }
 
+    private static final Object ADMIN_PROVISION_LOCK = new Object();
     private final java.util.concurrent.ConcurrentHashMap<String, CachedUserEntry> userAuthCache =
             new java.util.concurrent.ConcurrentHashMap<>();
     private static final long AUTH_CACHE_TTL_MS = 2 * 60 * 1000L; // 2 minutes
@@ -184,19 +185,24 @@ public class FirebaseAuthenticationFilter extends OncePerRequestFilter {
                     devUser = userRepository.findByEmail(email);
                 }
 
-                // Master Admin Auto-Heal: guarantee roevermca09@gmail.com is ALWAYS registered as ADMIN
+                // Master Admin Auto-Heal: guarantee roevermca09@gmail.com is ALWAYS registered as ADMIN (thread-safe)
                 if (devUser.isEmpty() && email != null && ("roevermca09@gmail.com".equalsIgnoreCase(email) || email.startsWith("roevermca09@"))) {
-                    logger.info("Auto-provisioning Master Admin account for {}", email);
-                    User adminUser = new User(
-                            firebaseUid != null ? firebaseUid : "firebase-admin-master",
-                            tokenName != null ? tokenName : "Roever Administrator",
-                            email.toLowerCase().trim(),
-                            Role.ADMIN,
-                            "Administration",
-                            null,
-                            true
-                    );
-                    devUser = Optional.of(userRepository.save(adminUser));
+                    synchronized (ADMIN_PROVISION_LOCK) {
+                        devUser = userRepository.findByEmail(email.toLowerCase().trim());
+                        if (devUser.isEmpty()) {
+                            logger.info("Auto-provisioning Master Admin account for {}", email);
+                            User adminUser = new User(
+                                    firebaseUid != null ? firebaseUid : "firebase-admin-master",
+                                    tokenName != null ? tokenName : "Roever Administrator",
+                                    email.toLowerCase().trim(),
+                                    Role.ADMIN,
+                                    "Administration",
+                                    null,
+                                    true
+                            );
+                            devUser = Optional.of(userRepository.save(adminUser));
+                        }
+                    }
                 }
 
                 if (devUser.isEmpty()) {
@@ -287,19 +293,24 @@ public class FirebaseAuthenticationFilter extends OncePerRequestFilter {
             userOptional = userRepository.findByEmail(email.toLowerCase().trim());
         }
 
-        // Master Admin Auto-Heal: guarantee roevermca09@gmail.com is ALWAYS registered as ADMIN
+        // Master Admin Auto-Heal: guarantee roevermca09@gmail.com is ALWAYS registered as ADMIN (thread-safe)
         if (userOptional.isEmpty() && email != null && ("roevermca09@gmail.com".equalsIgnoreCase(email) || email.startsWith("roevermca09@"))) {
-            logger.info("Auto-provisioning Master Admin account for {} with Firebase UID {}", email, firebaseUid);
-            User adminUser = new User(
-                    firebaseUid,
-                    name != null ? name : "Roever Administrator",
-                    email.toLowerCase().trim(),
-                    Role.ADMIN,
-                    "Administration",
-                    null,
-                    true
-            );
-            userOptional = Optional.of(userRepository.save(adminUser));
+            synchronized (ADMIN_PROVISION_LOCK) {
+                userOptional = userRepository.findByEmail(email.toLowerCase().trim());
+                if (userOptional.isEmpty()) {
+                    logger.info("Auto-provisioning Master Admin account for {} with Firebase UID {}", email, firebaseUid);
+                    User adminUser = new User(
+                            firebaseUid,
+                            name != null ? name : "Roever Administrator",
+                            email.toLowerCase().trim(),
+                            Role.ADMIN,
+                            "Administration",
+                            null,
+                            true
+                    );
+                    userOptional = Optional.of(userRepository.save(adminUser));
+                }
+            }
         }
 
         if (userOptional.isEmpty()) {

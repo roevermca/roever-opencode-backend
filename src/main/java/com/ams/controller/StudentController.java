@@ -14,6 +14,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.ams.dto.BulkDeleteRequest;
+import com.ams.dto.BulkDeleteResponse;
 import com.ams.dto.BulkStudentImportResponse;
 import com.ams.dto.PageResponse;
 import com.ams.dto.StudentRequest;
@@ -79,5 +81,23 @@ public class StudentController {
     public ResponseEntity<Void> deleteStudent(@PathVariable String id) {
         studentService.deleteStudent(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/bulk-delete")
+    public ResponseEntity<BulkDeleteResponse> deleteStudentsBulk(@RequestBody BulkDeleteRequest request) {
+        List<String> ids = request != null ? request.getIds() : List.of();
+        BulkDeleteResponse response = studentService.deleteStudentsBulk(ids);
+        return ResponseEntity.ok(response);
+    }
+
+    @DeleteMapping("/bulk")
+    public ResponseEntity<BulkDeleteResponse> deleteStudentsBulkByDeleteMethod(
+            @RequestBody(required = false) BulkDeleteRequest request,
+            @RequestParam(required = false) List<String> ids) {
+        List<String> targetIds = request != null && request.getIds() != null && !request.getIds().isEmpty()
+                ? request.getIds()
+                : (ids != null ? ids : List.of());
+        BulkDeleteResponse response = studentService.deleteStudentsBulk(targetIds);
+        return ResponseEntity.ok(response);
     }
 }

@@ -13,6 +13,7 @@ import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Service;
 
+import com.ams.dto.BulkDeleteResponse;
 import com.ams.dto.BulkStudentImportResponse;
 import com.ams.dto.PageResponse;
 import com.ams.dto.StudentRequest;
@@ -459,6 +460,27 @@ public class StudentService {
 
         // 4. Delete the student entity
         studentRepository.delete(student);
+    }
+
+    public BulkDeleteResponse deleteStudentsBulk(List<String> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return new BulkDeleteResponse(0, 0, 0, List.of());
+        }
+        int successCount = 0;
+        int failureCount = 0;
+        List<String> errors = new ArrayList<>();
+
+        for (String id : ids) {
+            if (id == null || id.isBlank()) continue;
+            try {
+                deleteStudent(id.trim());
+                successCount++;
+            } catch (Exception e) {
+                failureCount++;
+                errors.add("Failed to delete " + id + ": " + e.getMessage());
+            }
+        }
+        return new BulkDeleteResponse(ids.size(), successCount, failureCount, errors);
     }
 
     private void validateProgramDuration(ProgramType programType, Integer year) {

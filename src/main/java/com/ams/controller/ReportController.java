@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.ams.dto.AttendanceLedgerResponse;
 import com.ams.dto.DepartmentReportResponse;
 import com.ams.dto.OverallReportResponse;
 import com.ams.dto.StudentReportResponse;
@@ -87,6 +88,22 @@ public class ReportController {
 
         List<StudentReportResponse> response = reportService.getLowAttendanceReports(
                 startDate, endDate, departmentId, courseId, programType, year, section, threshold
+        );
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/ledger")
+    public ResponseEntity<AttendanceLedgerResponse> getAttendanceLedger(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(required = false) String departmentId,
+            @RequestParam(required = false) String courseId,
+            @RequestParam(required = false) ProgramType programType,
+            @RequestParam(required = false) Integer year,
+            @RequestParam(required = false) String section) {
+
+        AttendanceLedgerResponse response = reportService.getAttendanceLedger(
+                startDate, endDate, departmentId, courseId, programType, year, section
         );
         return ResponseEntity.ok(response);
     }

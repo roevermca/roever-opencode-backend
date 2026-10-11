@@ -25,8 +25,10 @@ import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 
+import com.ams.dto.AttendanceLedgerResponse;
 import com.ams.dto.DepartmentReportResponse;
 import com.ams.dto.OverallReportResponse;
+import com.ams.dto.StudentLedgerRowResponse;
 import com.ams.dto.StudentReportResponse;
 import com.ams.exception.AccessDeniedException;
 import com.ams.model.Attendance;
@@ -184,5 +186,97 @@ public class ReportServiceTest {
         assertEquals(1, caDept.getTotalStudents());
         assertEquals(1, caDept.getPresent());
         assertEquals(100.0, caDept.getAttendanceRate());
+    }
+
+    @Test
+    void testGetAttendanceLedger_PeriodLogic_FullDay_HalfDay_Absent() {
+        Department dept = new Department("MCA", "MCA", true);
+        dept.setId("dept-mca");
+        Course crs = new Course("Master of Computer Applications", "MCA", "dept-mca", ProgramType.PG, 2, true);
+        crs.setId("crs-mca");
+
+        Student student1 = new Student("25PCA001", "AGATHIYA A", "agathiya@ams.edu", "123", "dept-mca", "crs-mca", ProgramType.PG, 1, "A", true);
+        student1.setId("stu-1");
+
+        when(mongoTemplate.find(any(Query.class), eq(Student.class))).thenReturn(List.of(student1));
+        when(departmentRepository.findById("dept-mca")).thenReturn(Optional.of(dept));
+        when(courseRepository.findById("crs-mca")).thenReturn(Optional.of(crs));
+
+        LocalDate d1 = LocalDate.of(2025, 11, 19); // Wednesday
+        LocalDate d2 = LocalDate.of(2025, 11, 20); // Thursday
+        LocalDate d3 = LocalDate.of(2025, 11, 21); // Friday
+        LocalDate d4 = LocalDate.of(2025, 11, 24); // Monday
+
+        Instant now = Instant.now();
+        List<Attendance> records = List.of(
+                // d1: All 5 periods present -> Full day Present (P)
+                new Attendance("stu-1", d1, 1, AttendanceStatus.PRESENT, "staff-1", now),
+                new Attendance("stu-1", d1, 2, AttendanceStatus.PRESENT, "staff-1", now),
+                new Attendance("stu-1", d1, 3, AttendanceStatus.PRESENT, "staff-1", now),
+                new Attendance("stu-1", d1, 4, AttendanceStatus.PRESENT, "staff-1", now),
+                new Attendance("stu-1", d1, 5, AttendanceStatus.PRESENT, "staff-1", now),
+
+                // d2: Periods 1, 2, 3 Present, Periods 4, 5 Absent -> Morning Half Day (H)
+                new Attendance("stu-1", d2, 1, AttendanceStatus.PRESENT, "staff-1", now),
+                new Attendance("stu-1", d2, 2, AttendanceStatus.PRESENT, "staff-1", now),
+                new Attendance("stu-1", d2, 3, AttendanceStatus.PRESENT, "staff-1", now),
+                new Attendance("stu-1", d2, 4, AttendanceStatus.ABSENT, "staff-1", now),
+                new Attendance("stu-1", d2, 5, AttendanceStatus.ABSENT, "staff-1", now),
+
+                // d3: Periods 1, 2, 3 Absent, Periods 4, 5 Present -> Afternoon Half Day (H)
+                new Attendance("stu-1", d3, 1, AttendanceStatus.ABSENT, "staff-1", now),
+                new Attendance("stu-1", d3, 2, AttendanceStatus.ABSENT, "staff-1", now),
+                new Attendance("stu-1", d3, 3, AttendanceStatus.ABSENT, "staff-1", now),
+                new Attendance("stu-1", d3, 4, AttendanceStatus.PRESENT, "staff-1", now),
+                new Attendance("stu-1", d3, 5, AttendanceStatus.PRESENT, "staff-1", now),
+
+                // d4: All periods Absent -> Absent (A)
+                new Attendance("stu-1", d4, 1, AttendanceStatus.ABSENT, "staff-1", now),
+                new Attendance("stu-1", d4, 2, AttendanceStatus.ABSENT, "staff-1", now),
+                new Attendance("stu-1", d4, 3, AttendanceStatus.ABSENT, "staff-1", now),
+                new Attendance("stu-1", d4, 4, AttendanceStatus.ABSENT, "staff-1", now),
+                new Attendance("stu-1", d4, 5, AttendanceStatus.ABSENT, "staff-1", now)
+        );
+
+        when(mongoTemplate.find(any(Query.class), eq(Attendance.class))).thenReturn(records);
+
+        AttendanceLedgerResponse ledger = reportService.getAttendanceLedger(
+                d1, d4, "dept-mca", "crs-mca", ProgramType.PG, 1, "A"
+        );
+
+        assertNotNull(ledger);
+        assertEquals(4, ledger.getTotalWorkingDays());
+        assertEquals(1, ledger.getTotalStudents());
+        assertEquals("Class : I Master of Computer Applications 2025-2026", ledger.getClassName());
+
+        StudentLedgerRowResponse row = ledger.getStudents().get(0);
+        assertEquals("25PCA001", row.getRollNo());
+        assertEquals("AGATHIYA A", row.getName());
+        assertEquals(4, row.getWorkingDays());
+        // d1: P (1.0), d2: H (0.5), d3: H (0.5), d4: A (0.0) -> presentDays = 2.0
+        assertEquals(2.0, row.getPresentDays());
+        // d1: P (0.0), d2: H (0.5), d3: H (0.5), d4: A (1.0) -> absentDays = 2.0
+        assertEquals(2.0, row.getAbsentDays());
+        // Attendance rate: (2.0 / 4) * 100 = 50.0%
+        assertEquals(50.0, row.getAttendanceRate());
+
+        // Check daily status symbols
+        assertEquals("P", row.getAttendanceByDate().get(d1.toString()));
+        assertEquals("H", row.getAttendanceByDate().get(d2.toString()));
+        assertEquals("H", row.getAttendanceByDate().get(d3.toString()));
+        assertEquals("A", row.getAttendanceByDate().get(d4.toString()));
+
+        // Check daily totals
+        assertEquals(1.0, ledger.getDailyPresentTotals().get(d1.toString()));
+        assertEquals(0.0, ledger.getDailyAbsentTotals().get(d1.toString()));
+
+        assertEquals(0.5, ledger.getDailyPresentTotals().get(d2.toString()));
+        assertEquals(0.5, ledger.getDailyAbsentTotals().get(d2.toString()));
+
+        assertEquals(0.5, ledger.getDailyPresentTotals().get(d3.toString()));
+        assertEquals(0.5, ledger.getDailyAbsentTotals().get(d3.toString()));
+
+        assertEquals(0.0, ledger.getDailyPresentTotals().get(d4.toString()));
+        assertEquals(1.0, ledger.getDailyAbsentTotals().get(d4.toString()));
     }
 }
